@@ -1,0 +1,5 @@
+# Datos personales: nunca se publican
+private/
+rutina_actual_*.md
+# Pruebas locales (borran datos del navegador)
+tests/
