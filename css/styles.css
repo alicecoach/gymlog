@@ -418,3 +418,12 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .feel-row button:active { transform: scale(.92); }
 .feel-row button.on { border-color: var(--accent); background: rgba(255, 106, 43, .16); }
 .feel-row button.on span { animation: pop .35s var(--ease); }
+/* Series por músculo en el historial, entrenos pasados y corrección */
+.vol-track .vol-plan { position: absolute; top: -1px; bottom: -1px; width: 2px; margin-left: -1px; background: var(--text); opacity: .75; border-radius: 1px; }
+.week-vol summary { cursor: pointer; list-style: none; }
+.week-vol summary::-webkit-details-marker { display: none; }
+.week-vol summary::after { content: '▾'; float: right; color: var(--muted); }
+.week-vol:not([open]) summary::after { content: '▸'; }
+.past-note { font-size: .88rem; border: 1px solid rgba(91, 140, 255, .35); background: rgba(91, 140, 255, .08); }
+.edit-w { margin-top: 6px; }
+.sets .icon { min-width: 32px; }

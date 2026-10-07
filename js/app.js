@@ -102,16 +102,29 @@
   function confirmReplace() {
     return !S().activeWorkout || confirm('Ya tienes un entreno en curso. ¿Descartarlo y empezar otro?');
   }
-  function startWorkout(dayIdx) {
+  // past = { start, mins }: entreno de otro día que se anota a posteriori (sin cronómetro ni descansos).
+  function startWorkout(dayIdx, past) {
     const r = activeRoutine();
     if (!r || !confirmReplace()) return;
     const d = r.days[dayIdx];
     S().activeWorkout = {
-      id: Store.uid(), type: 'rutina', routineId: r.id, dayIndex: dayIdx, dayName: d.name, icon: d.icon, start: Date.now(),
+      id: Store.uid(), type: 'rutina', routineId: r.id, dayIndex: dayIdx, dayName: d.name, icon: d.icon, start: past ? past.start : Date.now(),
       exercises: d.exercises.map(x => newWorkoutEx(x.exId, { sets: x.sets, repMin: x.repMin, repMax: x.repMax, rir: x.rir, rest: x.rest, secs: x.secs }, x)),
     };
+    if (past) S().activeWorkout.past = past.mins;
     save();
     go('#/entreno');
+  }
+  function startPast(el) {
+    const date = document.getElementById('p-date').value, time = document.getElementById('p-time').value || '18:00';
+    const mins = Number(document.getElementById('p-mins').value) || 45;
+    const start = new Date(`${date}T${time}`).getTime();
+    if (!date || !(start < Date.now())) return toast('Elige una fecha y hora que ya hayan pasado.');
+    if (el.dataset.day !== undefined) return startWorkout(Number(el.dataset.day), { start, mins });
+    if (!confirmReplace()) return;
+    S().activeWorkout = { id: Store.uid(), type: 'libre', icon: '🏋️', dayName: 'Entreno libre', start, past: mins, exercises: [] };
+    save();
+    go('#/elegir/workout/0');
   }
   function startQuick(type) {
     const r = activeRoutine(), next = r ? nextDayIndex(r) : 0, T = Quick.TYPES[type];
@@ -138,7 +151,7 @@
     let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>` + cycleChip();
     if (s.activeWorkout) {
       h += `<a class="card live" href="#/entreno"><span class="pulse"></span><div class="grow"><b>Entreno en curso</b>
-        <small>${esc(s.activeWorkout.dayName)} · hace ${fmtDur(Date.now() - s.activeWorkout.start)}</small></div><span class="chev">›</span></a>`;
+        <small>${esc(s.activeWorkout.dayName)} · ${s.activeWorkout.past ? `📅 del ${fmtDate(s.activeWorkout.start)}` : `hace ${fmtDur(Date.now() - s.activeWorkout.start)}`}</small></div><span class="chev">›</span></a>`;
     }
     if (!r) {
       h += `<div class="card hero"><h2>Empecemos 💪</h2>
@@ -355,15 +368,36 @@
   }
 
   function volumeCard(r) {
-    const v = Generator.weeklyVolume(r);
-    const rows = Object.entries(v).sort((a, b) => b[1] - a[1]);
+    const bars = volBars(Generator.weeklyVolume(r));
+    return bars && `<div class="card"><h3>Series semanales por músculo</h3>
+      <p class="muted small">Referencia para hipertrofia/recomposición: ~10–20 series por músculo y semana (franja verde).</p>${bars}</div>`;
+  }
+  // Barras de series por músculo. Con plan, una marca indica lo que prevé la rutina.
+  function volBars(v, plan) {
+    const rows = Object.entries(v).filter(x => x[1] > 0 || plan?.[x[0]]).sort((a, b) => b[1] - a[1]);
     if (!rows.length) return '';
-    const max = Math.max(22, ...rows.map(x => x[1]));
-    return `<div class="card"><h3>Series semanales por músculo</h3>
-      <p class="muted small">Referencia para hipertrofia/recomposición: ~10–20 series por músculo y semana (franja verde).</p>
-      ${rows.map(([m, n]) => `<div class="vol"><span>${m}</span><div class="vol-track"><div class="vol-band" style="left:${10 / max * 100}%;width:${10 / max * 100}%"></div>
-        <div class="vol-bar ${n < 10 ? 'low' : n > 20 ? 'high' : 'ok'}" style="width:${n / max * 100}%"></div></div><b>${+n.toFixed(1)}</b></div>`).join('')}
-      </div>`;
+    const max = Math.max(22, ...rows.map(x => x[1]), ...Object.values(plan || {}));
+    return rows.map(([m, n]) => `<div class="vol"><span>${m}</span><div class="vol-track"><div class="vol-band" style="left:${10 / max * 100}%;width:${10 / max * 100}%"></div>
+        <div class="vol-bar ${n < 10 ? 'low' : n > 20 ? 'high' : 'ok'}" style="width:${n / max * 100}%"></div>
+        ${plan?.[m] ? `<i class="vol-plan" style="left:${plan[m] / max * 100}%" title="Plan: ${+plan[m].toFixed(1)}"></i>` : ''}</div><b>${+n.toFixed(1)}</b></div>`).join('');
+  }
+  // Series hechas por músculo en los últimos 7 días (principal 1, secundario ½, como el plan).
+  function doneVolume() {
+    const v = {}, since = startOfDay(Date.now()) - 6 * 864e5;
+    S().workouts.filter(w => w.start >= since && w.type !== 'hiit').forEach(w => w.exercises.forEach(e => {
+      const n = e.sets.filter(s => s.done !== false).length, ex = Store.exercise(e.exId);
+      ex.primary.forEach(m => v[m] = (v[m] || 0) + n);
+      ex.secondary.forEach(m => v[m] = (v[m] || 0) + n / 2);
+    }));
+    return v;
+  }
+  function weekVolumeCard() {
+    const r = activeRoutine(), plan = r ? Generator.weeklyVolume(r) : null;
+    const v = doneVolume();
+    if (plan) Object.keys(plan).forEach(m => { v[m] = v[m] || 0; });
+    const bars = volBars(v, plan);
+    return bars ? `<details class="card week-vol" open><summary><b>💪 Series por músculo · últimos 7 días</b></summary>
+      <p class="muted small">Franja verde: ~10–20 series por semana.${plan ? ' La rayita marca lo que prevé tu rutina.' : ''}</p>${bars}</details>` : '';
   }
 
   // Selector de ejercicios: para rutinas (añadir/cambiar) o para el entreno en curso.
@@ -469,8 +503,10 @@
         Object.entries(Quick.TYPES).map(([k, t]) => `<button class="qcard g-${t.grad}" data-act="quick" data-type="${k}"><span class="qi">${t.icon}</span><b>${t.label}</b><small>${t.desc}</small></button>`).join('') + '</div>';
     }
     if (w.type === 'hiit') return viewHiit(w);
-    let h = `<div class="workout-head"><div class="day-ic">${workoutIcon(w)}</div><div class="grow"><h2>${esc(w.dayName)}</h2><small>⏱ <span id="elapsed">${fmtDur(Date.now() - w.start)}</span></small></div>
-      <button class="btn primary" data-act="finish">Terminar</button></div><div id="msg"></div>`;
+    let h = `<div class="workout-head"><div class="day-ic">${workoutIcon(w)}</div><div class="grow"><h2>${esc(w.dayName)}</h2>
+      <small>${w.past ? `📅 ${fmtDate(w.start)} · ${w.past} min` : `⏱ <span id="elapsed">${fmtDur(Date.now() - w.start)}</span>`}</small></div>
+      <button class="btn primary" data-act="finish">${w.past ? 'Guardar' : 'Terminar'}</button></div><div id="msg"></div>`;
+    if (w.past) h += `<div class="card past-note">📅 Estás anotando un entreno pasado: rellena lo que hiciste y marca ✓ cada serie. Sin descansos ni cronómetro.</div>`;
     const notes = routineById(w.routineId)?.notes;
     if (notes) h += `<details class="card notes"><summary>📝 Notas de la rutina</summary><p>${esc(notes).replace(/\n/g, '<br>')}</p></details>`;
     w.exercises.forEach((e, ei) => { h += exerciseCard(e, ei); });
@@ -633,7 +669,8 @@
     if (!w) return '<p>Entreno no encontrado.</p>';
     const kg = Nutrition.lifted(w);
     let h = `<div class="card hero sum"><div class="day-ic big">${workoutIcon(w)}</div><h2>${esc(w.dayName)}</h2>
-      <p class="muted">${fmtDate(w.start)} · ${fmtDur(w.end - w.start)}</p>`;
+      <p class="muted">${fmtDate(w.start)} · ${fmtDur(w.end - w.start)}</p>
+      <a class="btn small ghost edit-w" href="#/editar/${w.id}">✏️ Corregir pesos, series o fecha</a>`;
     const cy = Cycle.at(w.start);
     if (cy) h += `<a class="cycle-chip small ${cy.phase ? 'ph-' + cy.phase : ''}" href="#/ciclo">${cy.phase ? Cycle.PHASES[cy.phase].icon : '🌙'} ${Cycle.label(cy)}</a>`;
     if (kg > 0) {
@@ -718,15 +755,57 @@
 
   function viewHistory() {
     const ws = S().workouts.slice().sort((a, b) => b.start - a.start);
-    if (!ws.length) return '<p class="muted">Todavía no has registrado entrenos.</p>';
+    const pastBtn = '<a class="btn block ghost" href="#/pasado">📅 Registrar un entreno de otro día</a>';
+    if (!ws.length) return '<p class="muted">Todavía no has registrado entrenos.</p>' + pastBtn;
     const c = S().cycle;
     const cyLink = c.enabled && !c.hormonal && !c.irregular ? `<a class="card row between nudge" href="#/ciclo"><div class="grow"><b>📊 Tu patrón del ciclo</b>
       <small>Tu energía y tus récords en cada fase</small></div><span class="chev">›</span></a>` : '';
-    return cyLink + '<h2>Historial</h2>' + ws.map(w => {
+    return weekVolumeCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
       const kg = Nutrition.lifted(w);
       return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
         <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
     }).join('');
+  }
+
+  const ymd = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const hhmm = ts => new Date(ts).toTimeString().slice(0, 5);
+
+  function viewPast() {
+    const r = activeRoutine();
+    return `<div class="card"><h2>📅 Entreno de otro día</h2>
+      <p class="muted small">Para cuando entrenaste y no lo anotaste. Cuenta para tu historial, tu progresión y el día que te toca.</p>
+      <div class="rx-fields two"><label>Fecha<input type="date" id="p-date" max="${ymd(Date.now())}" value="${ymd(Date.now() - 864e5)}"></label>
+      <label>Hora<input type="time" id="p-time" value="18:00"></label>
+      <label>Duración (min)<input type="number" inputmode="numeric" id="p-mins" value="45"></label></div></div>
+      <div class="section-head"><h2>¿Qué hiciste?</h2></div>
+      ${r ? r.days.map((d, i) => `<button class="card day btn-card" data-act="start-past" data-day="${i}"><div class="day-ic">${d.icon || '🏋️'}</div>
+        <div class="grow"><b>${esc(d.name)}</b><small>${esc(r.name)} · ${d.exercises.length} ejercicios</small></div><span class="chev">›</span></button>`).join('') : ''}
+      <button class="card day btn-card" data-act="start-past"><div class="day-ic">📝</div><div class="grow"><b>Entreno libre</b>
+        <small>Eliges tú los ejercicios</small></div><span class="chev">›</span></button>`;
+  }
+
+  // Corregir un entreno ya guardado: fecha, duración y cada serie. Se guarda al cambiar cada campo.
+  function viewEditWorkout(id) {
+    const w = S().workouts.find(x => x.id === id);
+    if (!w) return '<p>Entreno no encontrado.</p>';
+    const a = (ei, si) => `data-wid="${w.id}" data-ei="${ei}" data-si="${si}"`;
+    const num = (k, s, ei, si, dec) => `<td><input type="number" inputmode="${dec ? 'decimal' : 'numeric'}" ${dec ? 'step="any"' : ''} data-wf="${k}" ${a(ei, si)} value="${esc(s[k])}"></td>`;
+    let h = `<div class="card"><h2>✏️ Corregir entreno</h2><p class="muted small">${esc(w.dayName)} · los cambios se guardan solos.</p>
+      <div class="rx-fields two"><label>Fecha<input type="date" data-wd="date" data-wid="${w.id}" max="${ymd(Date.now())}" value="${ymd(w.start)}"></label>
+      <label>Hora<input type="time" data-wd="time" data-wid="${w.id}" value="${hhmm(w.start)}"></label>
+      <label>Duración (min)<input type="number" inputmode="numeric" data-wd="mins" data-wid="${w.id}" value="${Math.round((w.end - w.start) / 60000)}"></label></div></div>`;
+    if (w.type !== 'hiit') w.exercises.forEach((e, ei) => {
+      const st = Store.exSettings(e.exId), mode = st.mode;
+      const head = mode === 'tiempo' ? '<th>Tiempo</th>' : `<th>${mode === 'goma' ? 'Goma' : st.label}</th><th>Reps</th><th>RIR</th>`;
+      h += `<section class="card ex"><div class="rx-head">${thumb(e.exId, 'sm')}<div class="grow"><b>${esc(Store.exercise(e.exId).name)}</b></div>
+        <button class="icon" data-act="wedit-rm-ex" data-wid="${w.id}" data-ei="${ei}" title="Quitar ejercicio">✕</button></div>
+        <table class="sets ${mode === 'tiempo' ? 'hold' : mode === 'goma' ? 'band' : ''}"><thead><tr><th>#</th>${head}<th></th></tr></thead><tbody>${e.sets.map((s, si) => `<tr class="done"><td>${si + 1}</td>${
+          mode === 'tiempo' ? `<td><select data-wf="secs" ${a(ei, si)}>${secsOptions(s.secs)}</select></td>`
+          : (mode === 'goma' ? `<td><select data-wf="band" ${a(ei, si)}>${bandOptions(s.band)}</select></td>` : num('kg', s, ei, si, true)) + num('reps', s, ei, si) + num('rir', s, ei, si)}
+          <td>${e.sets.length > 1 ? `<button class="icon" data-act="wedit-del-set" ${a(ei, si)} title="Borrar serie">✕</button>` : ''}</td></tr>`).join('')}</tbody></table>
+        <button class="btn small ghost" data-act="wedit-add-set" data-wid="${w.id}" data-ei="${ei}">+ Serie</button></section>`;
+    });
+    return h + `<a class="btn block primary" href="#/resumen/${w.id}">Listo</a>`;
   }
 
   // Datos personales: en la bienvenida (ids w-*) o en Ajustes (se guardan al cambiar).
@@ -858,6 +937,8 @@
     [/^#\/ejercicio\/([\w-]+)$/, viewExercise, 'ejercicios', 'Ejercicio'],
     [/^#\/nuevo-ejercicio$/, viewNewExercise, 'ejercicios', 'Nueva máquina'],
     [/^#\/historial$/, viewHistory, 'historial', 'Historial'],
+    [/^#\/pasado$/, viewPast, 'historial', 'Entreno pasado'],
+    [/^#\/editar\/(\w+)$/, viewEditWorkout, 'historial', 'Corregir entreno'],
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
     [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
   ];
@@ -967,7 +1048,8 @@
     justDone = `${ei}-${si}`;
     navigator.vibrate && navigator.vibrate(30);
     const next = e.superset && S().activeWorkout.exercises[ei + 1];
-    if (next) { Timer.stop(); toast(`🔗 Sin descanso → ${Store.exercise(next.exId).name}`); }
+    if (S().activeWorkout.past) { /* entreno pasado: sin descansos */ }
+    else if (next) { Timer.stop(); toast(`🔗 Sin descanso → ${Store.exercise(next.exId).name}`); }
     else Timer.start(Number(e.target.rest) || S().settings.restDefault);
     save(); render(true);
   }
@@ -976,6 +1058,20 @@
   const routineOf = el => routineById(el.dataset.rid);
   const actions = {
     start: el => startWorkout(Number(el.dataset.day)),
+    'start-past': el => startPast(el),
+    'wedit-add-set': el => {
+      const sets = S().workouts.find(x => x.id === el.dataset.wid).exercises[el.dataset.ei].sets;
+      sets.push(Object.assign({}, sets[sets.length - 1], { done: true })); save(); render(true);
+    },
+    'wedit-del-set': el => {
+      S().workouts.find(x => x.id === el.dataset.wid).exercises[el.dataset.ei].sets.splice(Number(el.dataset.si), 1); save(); render(true);
+    },
+    'wedit-rm-ex': el => {
+      const w = S().workouts.find(x => x.id === el.dataset.wid);
+      if (w.exercises.length < 2) return toast('Si no queda ninguno, mejor borra el entreno desde el resumen.');
+      if (!confirm(`¿Quitar ${Store.exercise(w.exercises[el.dataset.ei].exId).name} de este entreno?`)) return;
+      w.exercises.splice(Number(el.dataset.ei), 1); save(); render(true);
+    },
     quick: el => startQuick(el.dataset.type),
     generate: () => {
       const brands = [...document.querySelectorAll('.g-brand:checked')].map(i => i.value);
@@ -1112,7 +1208,8 @@
       }
       w.exercises.forEach(e => { e.sets = e.sets.filter(s => s.done); delete e.suggestion; });
       w.exercises = w.exercises.filter(e => e.sets.length);
-      w.end = Date.now();
+      w.end = w.past ? w.start + w.past * 60000 : Date.now();
+      delete w.past;
       S().workouts.push(w); S().activeWorkout = null;
       Object.assign(Hiit, { idx: -1, running: false }); clearInterval(Hiit.int);
       save(); Timer.stop(); go('#/resumen/' + w.id);
@@ -1199,8 +1296,20 @@
 
   document.addEventListener('change', ev => {
     const t = ev.target, d = t.dataset;
-    const val = d.f === 'band' || d.xf === 'band' || d.xf === 'note' ? t.value : t.value === '' ? '' : Number(t.value);
-    if (d.f) { // serie del entreno en curso
+    const val = d.f === 'band' || d.wf === 'band' || d.xf === 'band' || d.xf === 'note' ? t.value : t.value === '' ? '' : Number(t.value);
+    if (d.wf) { // serie de un entreno ya guardado
+      S().workouts.find(x => x.id === d.wid).exercises[d.ei].sets[d.si][d.wf] = val; save();
+    } else if (d.wd) { // fecha, hora o duración de un entreno guardado
+      const w = S().workouts.find(x => x.id === d.wid), mins = Math.round((w.end - w.start) / 60000);
+      if (d.wd === 'mins') { if (val > 0) w.end = w.start + val * 60000; }
+      else {
+        const date = d.wd === 'date' ? t.value : ymd(w.start), time = d.wd === 'time' ? t.value : hhmm(w.start);
+        const start = new Date(`${date}T${time}`).getTime();
+        if (!date || !time || !(start <= Date.now())) { toast('Esa fecha no vale.'); return render(true); }
+        w.start = start; w.end = start + mins * 60000;
+      }
+      save();
+    } else if (d.f) { // serie del entreno en curso
       const sets = S().activeWorkout.exercises[d.ei].sets, si = Number(d.si), old = sets[si][d.f];
       sets[si][d.f] = val;
       // Si cambias el peso, la goma o el tiempo, se propaga a las series siguientes que tenían lo mismo y no están hechas.
