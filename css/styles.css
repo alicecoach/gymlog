@@ -427,3 +427,5 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .past-note { font-size: .88rem; border: 1px solid rgba(91, 140, 255, .35); background: rgba(91, 140, 255, .08); }
 .edit-w { margin-top: 6px; }
 .sets .icon { min-width: 32px; }
+.vol-bar.neutral { background: var(--blue); opacity: .55; }
+.vol.minor span, .vol.minor b { color: var(--muted); font-weight: 500; }

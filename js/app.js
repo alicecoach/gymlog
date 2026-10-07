@@ -367,19 +367,28 @@
         : `<label title="Peso para la primera sesión (después manda tu historial)">Peso ref.<input type="number" inputmode="decimal" step="any" data-xf="kg" ${a} value="${esc(x.kg)}"></label>`}</div>`;
   }
 
+  const VOL_NOTE = 'Franja verde: ~10–20 series por semana en los músculos grandes. Brazos, gemelos y core ya trabajan en los básicos: no necesitan llegar.';
   function volumeCard(r) {
     const bars = volBars(Generator.weeklyVolume(r));
-    return bars && `<div class="card"><h3>Series semanales por músculo</h3>
-      <p class="muted small">Referencia para hipertrofia/recomposición: ~10–20 series por músculo y semana (franja verde).</p>${bars}</div>`;
+    return bars && `<div class="card"><h3>Series semanales por músculo</h3><p class="muted small">${VOL_NOTE}</p>${bars}</div>`;
   }
+  // Para el contador, la espalda y el hombro van juntos; la franja 10–20 solo se aplica a los músculos grandes.
+  const VOL_GROUP = { Dorsal: 'Espalda', 'Espalda alta': 'Espalda', 'Hombro posterior': 'Hombro' };
+  const BIG = ['Glúteo', 'Cuádriceps', 'Isquios', 'Espalda', 'Pecho', 'Hombro'];
+  const groupVol = v => Object.entries(v || {}).reduce((a, [m, n]) => { const g = VOL_GROUP[m] || m; a[g] = (a[g] || 0) + n; return a; }, {});
   // Barras de series por músculo. Con plan, una marca indica lo que prevé la rutina.
-  function volBars(v, plan) {
-    const rows = Object.entries(v).filter(x => x[1] > 0 || plan?.[x[0]]).sort((a, b) => b[1] - a[1]);
+  function volBars(raw, rawPlan) {
+    const v = groupVol(raw), plan = rawPlan && groupVol(rawPlan);
+    const rows = Object.entries(v).filter(x => x[1] > 0 || plan?.[x[0]])
+      .sort((a, b) => BIG.includes(b[0]) - BIG.includes(a[0]) || b[1] - a[1]);
     if (!rows.length) return '';
     const max = Math.max(22, ...rows.map(x => x[1]), ...Object.values(plan || {}));
-    return rows.map(([m, n]) => `<div class="vol"><span>${m}</span><div class="vol-track"><div class="vol-band" style="left:${10 / max * 100}%;width:${10 / max * 100}%"></div>
-        <div class="vol-bar ${n < 10 ? 'low' : n > 20 ? 'high' : 'ok'}" style="width:${n / max * 100}%"></div>
-        ${plan?.[m] ? `<i class="vol-plan" style="left:${plan[m] / max * 100}%" title="Plan: ${+plan[m].toFixed(1)}"></i>` : ''}</div><b>${+n.toFixed(1)}</b></div>`).join('');
+    return rows.map(([m, n]) => {
+      const big = BIG.includes(m);
+      return `<div class="vol ${big ? '' : 'minor'}"><span>${m}</span><div class="vol-track">${big ? `<div class="vol-band" style="left:${10 / max * 100}%;width:${10 / max * 100}%"></div>` : ''}
+        <div class="vol-bar ${!big ? 'neutral' : n < 10 ? 'low' : n > 20 ? 'high' : 'ok'}" style="width:${n / max * 100}%"></div>
+        ${plan?.[m] ? `<i class="vol-plan" style="left:${plan[m] / max * 100}%" title="Plan: ${+plan[m].toFixed(1)}"></i>` : ''}</div><b>${+n.toFixed(1)}</b></div>`;
+    }).join('');
   }
   // Series hechas por músculo en los últimos 7 días (principal 1, secundario ½, como el plan).
   function doneVolume() {
@@ -397,7 +406,7 @@
     if (plan) Object.keys(plan).forEach(m => { v[m] = v[m] || 0; });
     const bars = volBars(v, plan);
     return bars ? `<details class="card week-vol" open><summary><b>💪 Series por músculo · últimos 7 días</b></summary>
-      <p class="muted small">Franja verde: ~10–20 series por semana.${plan ? ' La rayita marca lo que prevé tu rutina.' : ''}</p>${bars}</details>` : '';
+      <p class="muted small">${VOL_NOTE}${plan ? ' La rayita marca lo que prevé tu rutina.' : ''}</p>${bars}</details>` : '';
   }
 
   // Selector de ejercicios: para rutinas (añadir/cambiar) o para el entreno en curso.
