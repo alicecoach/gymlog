@@ -369,16 +369,28 @@
 
   const VOL_NOTE = 'Franja verde: ~10–20 series por semana en los músculos grandes. Brazos, gemelos y core ya trabajan en los básicos: no necesitan llegar.';
   function volumeCard(r) {
-    const bars = volBars(Generator.weeklyVolume(r));
+    const bars = volBars(planVolume(r));
     return bars && `<div class="card"><h3>Series semanales por músculo</h3><p class="muted small">${VOL_NOTE}</p>${bars}</div>`;
   }
   // Para el contador, la espalda y el hombro van juntos; la franja 10–20 solo se aplica a los músculos grandes.
   const VOL_GROUP = { Dorsal: 'Espalda', 'Espalda alta': 'Espalda', 'Hombro posterior': 'Hombro' };
   const BIG = ['Glúteo', 'Cuádriceps', 'Isquios', 'Espalda', 'Pecho', 'Hombro'];
-  const groupVol = v => Object.entries(v || {}).reduce((a, [m, n]) => { const g = VOL_GROUP[m] || m; a[g] = (a[g] || 0) + n; return a; }, {});
+  // Cuánto cuenta una serie para cada grupo: principal 1, secundario ½. Un remo que trabaja dorsal y espalda alta
+  // cuenta 1 para "Espalda", no 1,5.
+  function exShare(exId) {
+    const ex = Store.exercise(exId), s = {}, g = m => VOL_GROUP[m] || m;
+    ex.secondary.forEach(m => { s[g(m)] = Math.max(s[g(m)] || 0, 0.5); });
+    ex.primary.forEach(m => { s[g(m)] = 1; });
+    return s;
+  }
+  const addVol = (v, exId, n) => Object.entries(exShare(exId)).forEach(([m, k]) => { v[m] = (v[m] || 0) + n * k; });
+  function planVolume(r) {
+    const v = {};
+    r.days.forEach(d => d.exercises.forEach(x => addVol(v, x.exId, Number(x.sets) || 0)));
+    return v;
+  }
   // Barras de series por músculo. Con plan, una marca indica lo que prevé la rutina.
-  function volBars(raw, rawPlan) {
-    const v = groupVol(raw), plan = rawPlan && groupVol(rawPlan);
+  function volBars(v, plan) {
     const rows = Object.entries(v).filter(x => x[1] > 0 || plan?.[x[0]])
       .sort((a, b) => BIG.includes(b[0]) - BIG.includes(a[0]) || b[1] - a[1]);
     if (!rows.length) return '';
@@ -393,15 +405,12 @@
   // Series hechas por músculo en los últimos 7 días (principal 1, secundario ½, como el plan).
   function doneVolume() {
     const v = {}, since = startOfDay(Date.now()) - 6 * 864e5;
-    S().workouts.filter(w => w.start >= since && w.type !== 'hiit').forEach(w => w.exercises.forEach(e => {
-      const n = e.sets.filter(s => s.done !== false).length, ex = Store.exercise(e.exId);
-      ex.primary.forEach(m => v[m] = (v[m] || 0) + n);
-      ex.secondary.forEach(m => v[m] = (v[m] || 0) + n / 2);
-    }));
+    S().workouts.filter(w => w.start >= since && w.type !== 'hiit').forEach(w => w.exercises.forEach(e =>
+      addVol(v, e.exId, e.sets.filter(s => s.done !== false).length)));
     return v;
   }
   function weekVolumeCard() {
-    const r = activeRoutine(), plan = r ? Generator.weeklyVolume(r) : null;
+    const r = activeRoutine(), plan = r ? planVolume(r) : null;
     const v = doneVolume();
     if (plan) Object.keys(plan).forEach(m => { v[m] = v[m] || 0; });
     const bars = volBars(v, plan);
