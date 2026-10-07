@@ -1,5 +1,5 @@
 // Network-first: si hay conexión, usa la última versión; si no, la copia en caché.
-const CACHE = 'gymlog-v7';
+const CACHE = 'gymlog-v8';
 const FILES = ['./', 'index.html', 'css/styles.css', 'js/data/machines.js', 'js/data/icons.js', 'js/data/presets.js', 'js/store.js', 'js/progression.js',
   'js/generator.js', 'js/quick.js', 'js/nutrition.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 

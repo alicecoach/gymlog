@@ -38,7 +38,21 @@ const LOAD_TYPES = {
   cable: 'Polea',
   bodyweight: 'Peso corporal',
   implement: 'Kettlebell / balón',
+  band: 'Goma elástica',
+  hold: 'Isométrico (por tiempo)',
 };
+
+// Gomas de resistencia, de más suave a más dura (orden habitual tipo Theraband; varía según la marca).
+const BANDS = {
+  amarilla: { label: 'Amarilla', dot: '🟡' },
+  roja: { label: 'Roja', dot: '🔴' },
+  verde: { label: 'Verde', dot: '🟢' },
+  azul: { label: 'Azul', dot: '🔵' },
+  negra: { label: 'Negra', dot: '⚫' },
+  plateada: { label: 'Plateada', dot: '⚪' },
+};
+// Duraciones para los ejercicios por tiempo (planchas…).
+const HOLD_STEPS = [20, 30, 45, 60, 75, 90, 120];
 
 const MACHINES = (() => {
   const list = [];
@@ -131,6 +145,17 @@ const MACHINES = (() => {
   MM('mm-leg-press', 'Leg Press 45°', 'squat', 'plates', ['Cuádriceps'], ['Glúteo', 'Aductores']);
   MM('mm-glute', 'Glute Trainer', 'hinge', 'plates', ['Glúteo'], ['Isquios']);
   MM('mm-seated-calf', 'Seated Calf', 'calf', 'plates', ['Gemelos']);
+  MM('mm-decline-press', 'Decline Chest Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps']);
+  MM('mm-shoulder-press', 'Shoulder Press', 'press_vertical', 'plates', ['Hombro'], ['Tríceps']);
+  MM('mm-front-pulldown', 'Front Pulldown', 'pull_vertical', 'plates', ['Dorsal'], ['Bíceps', 'Espalda alta'], { unilateral: true });
+  MM('mm-low-row', 'Low Row', 'row', 'plates', ['Dorsal'], ['Espalda alta', 'Bíceps'], { unilateral: true });
+  MM('mm-high-row', 'High Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Hombro posterior'], { unilateral: true });
+  MM('mm-pendulum', 'Pendulum Squat', 'squat', 'plates', ['Cuádriceps'], ['Glúteo']);
+  MM('mm-belt-squat', 'Belt Squat', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores']);
+  MM('mm-leg-ext', 'Leg Extension', 'knee_ext', 'plates', ['Cuádriceps']);
+  MM('mm-leg-curl', 'Leg Curl', 'knee_flex', 'plates', ['Isquios']);
+  MM('mm-hip-thrust', 'Hip Thrust', 'hinge', 'plates', ['Glúteo'], ['Isquios'], { compound: false });
+  MM('mm-standing-calf', 'Standing Calf', 'calf', 'plates', ['Gemelos']);
 
   // ---------- Genérico: peso libre, poleas, multipower ----------
   const G = (...a) => add('Genérico', '', ...a);
@@ -156,10 +181,13 @@ const MACHINES = (() => {
   G('g-bulgarian', 'Sentadilla búlgara', 'squat', 'dumbbell', ['Cuádriceps', 'Glúteo'], [], { unilateral: true });
   G('g-rdl', 'Peso muerto rumano', 'hinge', 'barbell', ['Isquios', 'Glúteo'], ['Lumbar']);
   G('g-hip-thrust', 'Hip thrust con barra', 'hinge', 'barbell', ['Glúteo'], ['Isquios']);
-  G('g-plank', 'Plancha sobre antebrazos', 'core', 'bodyweight', ['Abdomen']);
-  G('g-high-plank', 'Plancha sobre manos', 'core', 'bodyweight', ['Abdomen']);
+  G('g-plank', 'Plancha sobre antebrazos', 'core', 'hold', ['Abdomen']);
+  G('g-high-plank', 'Plancha sobre manos', 'core', 'hold', ['Abdomen']);
+  G('g-side-plank-hand', 'Plancha lateral sobre mano', 'core', 'hold', ['Abdomen'], [], { unilateral: true });
   G('g-dead-bug', 'Dead bug', 'core', 'bodyweight', ['Abdomen']);
-  G('g-pallof', 'Press Pallof', 'core', 'cable', ['Abdomen']);
+  G('g-pallof', 'Press Pallof', 'core', 'band', ['Abdomen'], [], { unilateral: true });
+  G('g-cable-pallof', 'Press Pallof en polea', 'core', 'cable', ['Abdomen'], [], { unilateral: true });
+  G('g-band-walk', 'Paseo lateral con goma', 'abduction', 'band', ['Glúteo']);
   G('g-bird-dog', 'Bird dog', 'core', 'bodyweight', ['Abdomen'], ['Lumbar']);
   // Potencia y equilibrio
   G('g-jump-squat', 'Sentadilla con salto', 'power', 'bodyweight', ['Cuádriceps', 'Glúteo']);

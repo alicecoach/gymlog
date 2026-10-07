@@ -370,3 +370,15 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .energy b { display: block; font-size: 1.05rem; font-weight: 800; }
 .energy small { font-size: .7rem; }
 .card.nudge { border-color: rgba(91, 140, 255, .45); }
+
+/* ---------- gomas, ejercicios por tiempo y resumen en texto ---------- */
+.sets select { margin: 0; min-height: 46px; padding: 6px 4px; text-align: center; font-size: 1rem; font-weight: 700; }
+.sets tr.done select { background: rgba(52, 211, 153, .1); border-color: rgba(52, 211, 153, .35); }
+.sets.band td:nth-child(2) { width: 38%; }
+.hold-btn { width: 100%; min-width: 64px; height: 46px; border-radius: 12px; border: 1px solid var(--accent); background: rgba(255, 106, 43, .14); color: var(--accent); font-size: 1.15rem; font-weight: 800; cursor: pointer; }
+.hold-btn.on { background: var(--accent); color: #fff; animation: pulse-btn 1s ease-in-out infinite; }
+@keyframes pulse-btn { 50% { transform: scale(.94); } }
+.timer.holding { border-color: var(--ok); }
+.timer.holding .tbar { background: linear-gradient(90deg, #10b981, var(--ok)); }
+.timer.holding .tlabel { font-size: 1.1rem; }
+.ai-sum textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem; line-height: 1.4; margin-bottom: 8px; }

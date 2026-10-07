@@ -89,9 +89,12 @@ const Store = (() => {
     { id, name: 'Ejercicio eliminado', brand: '', line: '', pattern: 'core', load: 'stack', primary: [], secondary: [] };
 
   // Cómo se anota el peso y cuánto se sube cada vez, según el tipo de carga.
-  const MODES = { total: 'kg', lado: 'kg/lado', mancuerna: 'kg/manc.', lastre: '+kg' };
+  // 'goma' anota el color de la goma y 'tiempo' los segundos (planchas…), en vez del peso.
+  const MODES = { total: 'kg', lado: 'kg/lado', mancuerna: 'kg/manc.', lastre: '+kg', goma: 'goma', tiempo: 'segundos' };
   function defaultLoad(ex) {
     switch (ex.load) {
+      case 'band': return { mode: 'goma', increment: 1 };
+      case 'hold': return { mode: 'tiempo', increment: 15 };
       case 'plates': return { mode: 'lado', increment: 2.5 };
       case 'stack': return { mode: 'total', increment: 5 };
       case 'dumbbell': return { mode: 'mancuerna', increment: 2 };

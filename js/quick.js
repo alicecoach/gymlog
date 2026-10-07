@@ -76,8 +76,8 @@ const Quick = (() => {
           const last = Progression.historyFor(x.exId)[0];
           const kg = last ? Progression.topWeight(last.sets) : x.kg;
           return { exId: x.exId,
-            target: { sets: Math.max(1, Math.ceil(x.sets / 2)), repMin: x.repMin, repMax: x.repMax, rir: Math.max(3, Number(x.rir) + 2), rest: x.rest },
-            ref: { kg, note: x.note }, deload: true };
+            target: { sets: Math.max(1, Math.ceil(x.sets / 2)), repMin: x.repMin, repMax: x.repMax, rir: Math.max(3, Number(x.rir) + 2), rest: x.rest, secs: x.secs },
+            ref: { kg, note: x.note, band: x.band }, deload: true };
         });
       }
     }
