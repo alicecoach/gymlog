@@ -1,7 +1,7 @@
 // Network-first: si hay conexión, usa la última versión; si no, la copia en caché.
-const CACHE = 'gymlog-v8';
+const CACHE = 'gymlog-v9';
 const FILES = ['./', 'index.html', 'css/styles.css', 'js/data/machines.js', 'js/data/icons.js', 'js/data/presets.js', 'js/store.js', 'js/progression.js',
-  'js/generator.js', 'js/quick.js', 'js/nutrition.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
+  'js/generator.js', 'js/quick.js', 'js/nutrition.js', 'js/cycle.js', 'js/app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));

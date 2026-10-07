@@ -135,7 +135,7 @@
   // ---------- vistas ----------
   function viewHome() {
     const s = S(), r = activeRoutine(), u = Store.currentUser();
-    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>`;
+    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>` + cycleChip();
     if (s.activeWorkout) {
       h += `<a class="card live" href="#/entreno"><span class="pulse"></span><div class="grow"><b>Entreno en curso</b>
         <small>${esc(s.activeWorkout.dayName)} · hace ${fmtDur(Date.now() - s.activeWorkout.start)}</small></div><span class="chev">›</span></a>`;
@@ -183,6 +183,88 @@
       }
     }
     return h + `<div class="card tip">💡 ${TIPS[Math.floor(Date.now() / 864e5) % TIPS.length]}</div>`;
+  }
+
+  // ---------- ciclo ----------
+  // Chip discreto en Inicio. Sin alarmas: si se retrasa, solo invita a anotarlo.
+  function cycleChip() {
+    if (!S().cycle.enabled) return '';
+    const st = Cycle.at();
+    if (!st) return `<a class="cycle-chip" href="#/ciclo">🌙 Anota el primer día de tu regla<span class="chev">›</span></a>`;
+    const ask = st.late ? '¿Ya te ha venido? Anótalo cuando quieras' : '';
+    return `<div class="cycle-row"><a class="cycle-chip ${st.phase ? 'ph-' + st.phase : ''}" href="#/ciclo">${st.phase ? Cycle.PHASES[st.phase].icon : '🌙'} ${ask || Cycle.label(st)}<span class="chev">›</span></a>
+      ${st.due ? '<button class="cycle-chip btn-chip" data-act="cycle-start" data-when="today">🩸 Me ha venido hoy</button>' : ''}</div>`;
+  }
+
+  function viewCycle() {
+    const c = S().cycle;
+    if (!c.enabled) return `<div class="card hero"><div class="day-ic big">🌙</div><h2>Seguimiento del ciclo</h2>
+      <p class="muted">Está desactivado. Puedes activarlo en Ajustes.</p><a class="btn primary" href="#/ajustes">Ir a Ajustes</a></div>`;
+    const st = Cycle.at(), today = Cycle.ymd();
+    let h = '';
+    if (st) {
+      const ph = st.phase && Cycle.PHASES[st.phase], pat = Cycle.pattern(), mine = st.phase && pat.phases[st.phase];
+      h += `<div class="card hero cycle-hero ${st.phase ? 'ph-' + st.phase : ''}"><div class="cy-day"><small>Día</small><b>${st.day}</b><small>de ~${st.len}</small></div>
+        <h2>${ph ? `${ph.icon} Fase ${ph.label}` : '🌙 Tu ciclo'}</h2>`;
+      if (st.phase) {
+        const ov = Math.max(10, st.len - 14), seg = [5, ov - 7, 3, st.len - ov - 1];
+        h += `<div class="cy-bar">${Cycle.ORDER.map((p, i) => `<i class="ph-${p}" style="flex:${Math.max(1, seg[i])}"></i>`).join('')}
+          <span class="cy-mark" style="left:${Math.min(100, (st.day - 0.5) / st.len * 100)}%"></span></div>`;
+        // Con datos suficientes, tus números sustituyen a la frase genérica.
+        h += pat.ready && mine.n >= 3
+          ? `<p class="cy-note">📊 <b>Tus datos:</b> en esta fase tu energía media es <b>${fmtNum(mine.avg)}/4</b> (${mine.n} entrenos)${mine.prs ? ` y llevas <b>${mine.prs} ${mine.prs === 1 ? 'récord' : 'récords'}</b> 🏆` : ''}.</p>`
+          : `<p class="cy-note">${ph.note}</p>`;
+        h += `<p class="cy-tip">💡 ${Cycle.tip(st.phase)}</p>`;
+      } else h += `<p class="cy-note">${c.hormonal ? 'Con anticonceptivo hormonal las fases se aplanan, así que no te muestro fases ni consejos por fase.' : 'Con ciclos irregulares las fases estimadas fallan mucho, así que solo te muestro el día.'}</p>`;
+      h += `<p class="muted small">Orientativo: manda cómo te sientes hoy, no el calendario.</p></div>`;
+    } else {
+      h += `<div class="card hero"><div class="day-ic big">🌙</div><h2>Tu ciclo</h2><p class="muted">Anota el primer día de tu última regla para empezar.</p></div>`;
+    }
+    h += `<div class="card"><h3>🩸 Me ha venido la regla</h3>
+      <button class="btn primary block" data-act="cycle-start" data-when="today">Hoy</button>
+      <div class="row gap"><input type="date" id="cy-date" max="${today}" value="${today}" class="grow" style="width:auto;flex:1;margin:0">
+      <button class="btn" data-act="cycle-start">Otro día</button></div></div>`;
+    h += patternCard();
+    const list = Cycle.starts().reverse();
+    if (list.length) h += `<div class="card"><h3>Reglas anotadas</h3>${list.slice(0, 8).map((s, i) => {
+      const len = i > 0 ? Math.round((Date.parse(list[i - 1]) - Date.parse(s)) / 864e5) : null;
+      return `<div class="hist-row"><span>${Cycle.fmt(s)}</span><span class="grow muted">${len ? `ciclo de ${len} días` : 'actual'}</span>
+        <button class="icon" data-act="cycle-del" data-d="${s}" title="Borrar">✕</button></div>`;
+    }).join('')}<p class="muted small">Duración media: ${Cycle.avgLength()} días${list.length < 2 ? ' (estimada hasta tener dos reglas anotadas)' : ''}.</p></div>`;
+    return h + `<a class="btn block ghost" href="#/ajustes">⚙️ Opciones del ciclo</a>
+      <p class="muted small">No es un método anticonceptivo ni diagnóstico. Tus datos del ciclo solo se guardan en este móvil.</p>`;
+  }
+
+  function patternCard() {
+    const c = S().cycle;
+    if (c.hormonal || c.irregular) return '';
+    const pat = Cycle.pattern();
+    if (!pat.ready) return `<div class="card"><h3>📊 Tu patrón</h3><p class="muted small">Valora cómo te has sentido al terminar cada entreno (😴 😐 🙂 💪).
+      Con 2 ciclos anotados verás tu energía y tus récords en cada fase: <b>tus datos, no un promedio</b>.</p>
+      <p class="small">Llevas ${pat.rated} ${pat.rated === 1 ? 'entreno valorado' : 'entrenos valorados'} · ${Math.max(0, Cycle.starts().length - 1)} de 2 ciclos completos.</p></div>`;
+    return `<div class="card"><h3>📊 Tu patrón</h3><p class="muted small">Energía media y récords en cada fase, con tus entrenos valorados.</p>
+      ${Cycle.ORDER.map(p => { const x = pat.phases[p], P = Cycle.PHASES[p];
+        return `<div class="vol cy-vol"><span>${P.icon} ${P.label[0].toUpperCase() + P.label.slice(1)}</span>
+          <div class="vol-track"><div class="vol-bar ph-${p}" style="width:${x.avg / 4 * 100}%"></div></div>
+          <b>${x.n ? fmtNum(x.avg) : '–'}</b></div><small class="cy-sub">${x.n} ${x.n === 1 ? 'entreno' : 'entrenos'}${x.prs ? ` · ${x.prs} 🏆` : ''}</small>`; }).join('')}</div>`;
+  }
+
+  function energyCard(w) {
+    return `<div class="card feel"><h3>¿Cómo te has sentido hoy?</h3><div class="feel-row">${Object.entries(Cycle.ENERGY).map(([v, e]) =>
+      `<button class="${w.energy === Number(v) ? 'on' : ''}" data-act="rate-energy" data-id="${w.id}" data-v="${v}"><span>${e.icon}</span><small>${e.label}</small></button>`).join('')}</div></div>`;
+  }
+
+  function cycleSettings() {
+    const c = S().cycle;
+    if (S().settings.sex !== 'mujer' && !c.enabled) return '';
+    const chk = (k, txt) => `<label class="check-row"><input type="checkbox" data-cy="${k}" ${c[k] ? 'checked' : ''}> ${txt}</label>`;
+    return `<div class="card"><h3>🌙 Seguimiento del ciclo</h3>
+      <p class="muted small">Opcional. Te dice en qué fase estás y te da algún consejo, pero nunca cambia tu rutina: manda cómo te sientes.</p>
+      ${chk('enabled', 'Activar seguimiento del ciclo')}
+      ${c.enabled ? `${chk('hormonal', 'Uso anticonceptivo hormonal')}${chk('irregular', 'Ciclo irregular o perimenopausia')}
+        ${chk('share', 'Incluir la fase en el resumen en texto')}
+        <div class="row gap"><a class="btn small" href="#/ciclo">🌙 Mi ciclo</a>
+        <button class="btn small ghost danger" data-act="cycle-clear">Borrar datos del ciclo</button></div>` : ''}</div>`;
   }
 
   function viewGenerator() {
@@ -552,6 +634,8 @@
     const kg = Nutrition.lifted(w);
     let h = `<div class="card hero sum"><div class="day-ic big">${workoutIcon(w)}</div><h2>${esc(w.dayName)}</h2>
       <p class="muted">${fmtDate(w.start)} · ${fmtDur(w.end - w.start)}</p>`;
+    const cy = Cycle.at(w.start);
+    if (cy) h += `<a class="cycle-chip small ${cy.phase ? 'ph-' + cy.phase : ''}" href="#/ciclo">${cy.phase ? Cycle.PHASES[cy.phase].icon : '🌙'} ${Cycle.label(cy)}</a>`;
     if (kg > 0) {
       const c = Nutrition.compare(kg);
       const prev = S().workouts.filter(x => x.id !== w.id && x.start < w.start && (x.dayName === w.dayName || (w.routineId && x.routineId === w.routineId && x.dayIndex === w.dayIndex)))
@@ -567,6 +651,7 @@
     }
     h += `<div class="stats inner"><div><b>${doneSets(w)}</b><small>series</small></div><div><b>${w.exercises.length}</b><small>ejercicios</small></div><div><b>${fmtDur(w.end - w.start)}</b><small>duración</small></div></div></div>`;
 
+    h += energyCard(w);
     h += `<div class="card"><label class="kcal">🔥 Kcal que marca tu reloj<input type="number" inputmode="numeric" data-kcal="${w.id}" value="${esc(w.kcal)}" placeholder="p. ej. 320"></label>
       <div id="nutri">${nutritionHTML(w)}</div></div>`;
 
@@ -598,6 +683,9 @@
     const L = [`Entreno GymLog · ${date}, ${time}`, `Sesión: ${w.dayName}${r ? ` (rutina "${r.name}")` : ''}`,
       `Duración: ${fmtDur(w.end - w.start)} · ${doneSets(w)} series · ${w.exercises.length} ejercicios` +
       (kg ? ` · ${kg.toLocaleString('es-ES')} kg movidos en total` : '') + (w.kcal ? ` · ${w.kcal} kcal (reloj)` : '')];
+    if (w.energy) L.push(`Sensación: ${Cycle.ENERGY[w.energy].label.replace(/[¡!]/g, '').toLowerCase()} (${w.energy}/4)`);
+    const cy = S().cycle.share && Cycle.at(w.start);
+    if (cy) L.push(`Ciclo menstrual: ${Cycle.label(cy).toLowerCase()}`);
     if (w.type === 'hiit') L.push(`HIIT: ${w.hiit?.rounds} rondas de ${w.hiit?.work} s trabajo / ${w.hiit?.rest} s descanso`);
     w.exercises.forEach((e, i) => {
       const ex = Store.exercise(e.exId), st = Store.exSettings(e.exId), t = e.target || {};
@@ -631,9 +719,12 @@
   function viewHistory() {
     const ws = S().workouts.slice().sort((a, b) => b.start - a.start);
     if (!ws.length) return '<p class="muted">Todavía no has registrado entrenos.</p>';
-    return '<h2>Historial</h2>' + ws.map(w => {
+    const c = S().cycle;
+    const cyLink = c.enabled && !c.hormonal && !c.irregular ? `<a class="card row between nudge" href="#/ciclo"><div class="grow"><b>📊 Tu patrón del ciclo</b>
+      <small>Tu energía y tus récords en cada fase</small></div><span class="chev">›</span></a>` : '';
+    return cyLink + '<h2>Historial</h2>' + ws.map(w => {
       const kg = Nutrition.lifted(w);
-      return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}</b>
+      return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
         <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
     }).join('');
   }
@@ -700,6 +791,7 @@
     return `<a class="card row between" href="#/usuarios"><div class="day-ic">${u.avatar}</div><div class="grow" style="margin-left:12px"><b>${esc(u.name)}</b>
         <small>Perfil activo · cambiar o añadir persona</small></div><span class="chev">›</span></a>
       <div class="card" id="body-card"><h2>Mis datos</h2>${bodyFields(false)}<div id="energy">${energyHTML()}</div></div>
+      ${cycleSettings()}
       <div class="card"><h2>Ajustes</h2>
       <label>Descanso por defecto (s)<input type="number" id="s-rest" value="${S().settings.restDefault}"></label></div>
       <div class="card"><h3>Material de mi gimnasio</h3><p class="muted small">Marcas que salen en las alternativas, el generador y los entrenos rápidos.</p>
@@ -767,6 +859,7 @@
     [/^#\/nuevo-ejercicio$/, viewNewExercise, 'ejercicios', 'Nueva máquina'],
     [/^#\/historial$/, viewHistory, 'historial', 'Historial'],
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
+    [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
   ];
   function render(keepScroll) {
     // Sin ningún perfil todavía: primero la bienvenida.
@@ -1033,6 +1126,24 @@
       if (!confirm('¿Borrar este entreno del historial?')) return;
       S().workouts = S().workouts.filter(w => w.id !== el.dataset.id); save(); go('#/historial');
     },
+    'rate-energy': el => {
+      const w = S().workouts.find(x => x.id === el.dataset.id), v = Number(el.dataset.v);
+      w.energy = w.energy === v ? undefined : v; save();
+      // Sin re-render: así no se reinicia el contador animado de kilos.
+      el.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === w.energy));
+      document.getElementById('sum-text').value = summaryText(w);
+      if (w.energy) toast(`${Cycle.ENERGY[v].icon} Anotado. ¡Gracias!`);
+    },
+    'cycle-start': el => {
+      const date = el.dataset.when === 'today' ? Cycle.ymd() : document.getElementById('cy-date')?.value;
+      if (!date || date > Cycle.ymd()) return toast('Elige una fecha que no sea futura.');
+      if (Cycle.addStart(date)) { toast(`🩸 Anotado: ${Cycle.fmt(date)}`); render(true); }
+    },
+    'cycle-del': el => { if (confirm(`¿Borrar la regla del ${Cycle.fmt(el.dataset.d)}?`)) { Cycle.removeStart(el.dataset.d); render(true); } },
+    'cycle-clear': () => {
+      if (!confirm('¿Borrar todas las fechas y opciones del ciclo? Tus entrenos y valoraciones se mantienen.')) return;
+      Cycle.reset(); toast('Datos del ciclo borrados'); render(true);
+    },
     'copy-summary': () => {
       const ta = document.getElementById('sum-text');
       const fallback = () => { ta.select(); try { document.execCommand('copy'); toast('📋 Resumen copiado'); } catch (e) { toast('Mantén pulsado el texto para copiarlo'); } };
@@ -1125,8 +1236,10 @@
       if (BODY_SETTINGS.includes(d.body)) S().settings[d.body] = d.body === 'sex' ? t.value : val;
       else { S().profile = Object.assign({ brands: Generator.BRANDS.slice() }, S().profile, { [d.body]: d.body === 'days' ? Number(t.value) : t.value }); }
       save();
+      if (d.body === 'sex') return render(true); // muestra u oculta el seguimiento del ciclo
       document.getElementById('energy').innerHTML = energyHTML();
     }
+    else if (d.cy) { S().cycle[d.cy] = t.checked; save(); render(true); }
     else if (t.id === 'import-routine' && t.files[0]) importRoutineFile(t.files[0], res => res && go('#/rutina/' + res.routine.id));
     else if (t.id === 'w-import' && t.files[0]) {
       const file = t.files[0];

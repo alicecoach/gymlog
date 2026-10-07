@@ -16,6 +16,7 @@ const Store = (() => {
     exerciseSettings: {},     // { [exId]: { mode, increment } }
     photos: {},               // { [exId]: dataURL }
     presetsLoaded: [],        // claves de PRESETS ya cargadas
+    cycle: { enabled: false, starts: [], hormonal: false, irregular: false, share: false }, // seguimiento opcional del ciclo
   });
   let users = null;           // { current, list: [{ id, name, avatar }] }
   let state = null;
@@ -47,6 +48,7 @@ const Store = (() => {
     const u = currentUser();
     state = Object.assign(defaults(), (u && read(dataKey(u.id))) || {});
     state.settings = Object.assign(defaults().settings, state.settings);
+    state.cycle = Object.assign(defaults().cycle, state.cycle);
     return state;
   }
   function get() { return state || load(); }
