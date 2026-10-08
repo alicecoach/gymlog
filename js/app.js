@@ -8,7 +8,7 @@
   const fmtRest = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
   const fmtNum = n => Number(n).toLocaleString('es-ES', { maximumFractionDigits: 1 });
   const go = hash => { location.hash = hash; };
-  const ui = { q: '', brand: 'all', muscle: 'all', samePattern: true };
+  const ui = { q: '', brand: 'all', muscle: 'all', load: 'all', samePattern: true };
   let justDone = null; // serie recién marcada, para animarla
   let swapOpen = null; // ejercicio del entreno con el panel de alternativas abierto
   let holdOn = null;   // serie por tiempo con la cuenta atrás en marcha ("ei-si")
@@ -25,7 +25,68 @@
     'Si te estancas en varios ejercicios a la vez, toca una semana de descarga.',
     'Controla la fase excéntrica (2–3 s): más tensión, menos lesiones.',
   ];
-  const CORE = ['g-dead-bug', 'g-pallof', 'g-high-plank', 'g-cable-crunch', 'g-bird-dog', 'hss-ab-crunch'];
+  // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
+  const NEWS = [
+    { v: 3, date: '2026-10-08', items: [
+      '📈 <b>Progreso por grupo muscular</b> en Historial: series por semana y fuerza de glúteo, espalda, pecho…',
+      '🏋️ <b>Más de 100 ejercicios nuevos</b> con mancuernas, kettlebell, banco, goma y sin material para todos los grupos.',
+      '🎯 <b>Core</b>: russian twist, sit-ups con peso, inclinación lateral con kettlebell, leñador, hollow hold y muchos más. El remate de core va rotando: uno frontal, uno de rotación y uno lateral.',
+      '🐾 <b>Animal Flow y movilidad</b>: nuevo entreno rápido de ~20 min sin material, y Animal Flow también en Potencia.',
+      '💡 <b>Consejos de uso</b> en ⚙️ Ajustes para sacarle partido a la app.',
+    ] },
+    { v: 2, date: '2026-10-08', items: [
+      '🛟 <b>Comodines de racha</b>: 2 al mes. Si una semana no llegas, tu racha sigue.',
+      '🏅 <b>Medallas</b> por constancia, récords y kilos. Míralas tocando tu racha en Inicio.',
+      '🎉 Confeti al batir un récord, cumplir la semana o ganar una medalla.',
+    ] },
+    { v: 1, date: '2026-10-08', items: [
+      '🔥 <b>Series de aproximación</b> en los básicos (50 % × 8 y 75 % × 4).',
+      '📝 <b>Molestias y notas</b> por ejercicio: te lo recuerda la próxima vez.',
+      '📈 Gráfica de 1RM estimado en la ficha de cada ejercicio.',
+      '📅 Racha semanal y resumen de cada mes.',
+    ] },
+  ];
+  const newsHTML = list => list.map(n => `<div class="news-block"><small class="muted">${Cycle.fmt(n.date)}</small><ul>${n.items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('');
+  // Solo a quien ya usaba la app: un perfil nuevo empieza con todo visto.
+  function checkNews() {
+    const st = S().settings, top = NEWS[0].v;
+    if ((st.seenNews || 0) >= top) return;
+    // Sin registro previo (perfiles de antes de este aviso): solo lo último.
+    const fresh = st.seenNews === undefined ? NEWS.slice(0, 1) : NEWS.filter(n => n.v > st.seenNews);
+    if (!S().workouts.length) { st.seenNews = top; save(); return; }
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+    bg.innerHTML = `<div class="sheet" role="dialog" aria-label="Novedades"><div class="sheet-ic">✨</div><h2>Novedades en GymLog</h2>
+      ${newsHTML(fresh.slice(0, 2))}<button class="btn primary block" data-act="news-ok">¡Genial!</button></div>`;
+    document.body.appendChild(bg);
+    requestAnimationFrame(() => bg.classList.add('show'));
+  }
+
+  // Consejos de uso, en Ajustes.
+  const HOWTO = [
+    ['📲', 'Instálala', 'En Chrome, menú ⋮ → «Añadir a pantalla de inicio». Funciona sin conexión en el gimnasio.'],
+    ['✅', 'Marca cada serie', 'Al tocar ✓ arranca el descanso y la app aprende: la próxima vez te propone peso y reps.'],
+    ['📈', 'Sigue la sugerencia', 'Doble progresión: cuando llegas al tope de reps en todas las series, toca subir peso. Si te estancas, te avisa.'],
+    ['🎯', 'Anota el RIR', 'Las reps que te quedaban en la recámara. Con él las sugerencias se ajustan mejor a ti.'],
+    ['⇄', '¿Máquina ocupada?', 'Toca ⇄ en el ejercicio: alternativas que trabajan lo mismo, solo para hoy.'],
+    ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
+    ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
+    ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
+    ['⚡', 'Entrenos rápidos', 'Para días raros: full body, HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
+    ['📅', '¿Se te olvidó anotar?', 'Historial → «Registrar un entreno de otro día». Desde cada resumen puedes corregir pesos y fechas.'],
+    ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
+    ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],
+    ['💾', 'Copia de seguridad', 'Tus datos viven solo en este móvil. Exporta una vez al mes y guárdala en Drive.'],
+    ['👥', 'Varias personas', 'Toca tu avatar arriba para añadir a otra persona: cada una con sus rutinas e historial.'],
+  ];
+
+  // Remate de core: uno de cada tipo (flexión / anti-extensión, rotación / anti-rotación, lateral), rotando entre entrenos.
+  // Sin apoyo de codos.
+  const CORE = [
+    ['g-dead-bug', 'g-cable-crunch', 'g-reverse-crunch', 'g-weighted-situp', 'g-high-plank', 'hss-ab-crunch', 'g-hollow', 'af-beast-hold', 'g-bird-dog'],
+    ['g-pallof', 'g-russian-twist', 'g-cable-woodchop', 'g-bicycle', 'g-cable-pallof', 'af-side-kick'],
+    ['g-kb-side-bend', 'g-side-plank-hand', 'g-suitcase-carry', 'g-heel-touch', 'g-db-side-bend'],
+  ];
 
   // ---------- helpers de datos ----------
   const activeRoutine = () => S().routines.find(r => r.id === S().activeRoutineId) || null;
@@ -43,7 +104,7 @@
     return lo >= up * 2 ? 'lower' : up >= lo * 2 ? 'upper' : 'full';
   }
   const dayRegion = d => regionOf(d.exercises.map(x => [x.exId, Number(x.sets) || 1]));
-  const workoutRegion = w => ['hiit', 'potencia'].includes(w.type) ? null : regionOf(w.exercises.map(e => [e.exId, e.sets.length]));
+  const workoutRegion = w => ['hiit', 'potencia', 'movilidad'].includes(w.type) ? null : regionOf(w.exercises.map(e => [e.exId, e.sets.length]));
   const lastDone = (r, i) => S().workouts.filter(w => w.routineId === r.id && w.dayIndex === i).reduce((a, w) => Math.max(a, w.start), 0);
   const startOfDay = ts => new Date(ts).setHours(0, 0, 0, 0);
   const daysAgo = ts => Math.round((startOfDay(Date.now()) - startOfDay(ts)) / 864e5);
@@ -278,7 +339,7 @@
   }
 
   // ---------- medallas ----------
-  // Cada medalla mira una métrica y un umbral; la fecha es la del entreno (o medida) con que la alcanzaste.
+  // Cada medalla mira una métrica y un umbral; la fecha es la del entreno con que la alcanzaste.
   const MEDALS = [
     ['Constancia', 'workouts', 1, '👟', 'Primer paso', 'Tu primer entreno'],
     ['Constancia', 'workouts', 10, '🚶', 'En marcha', '10 entrenos'],
@@ -306,11 +367,10 @@
     ['Hábitos', 'warmup', 20, '🌡️', 'Calentamiento de manual', '20 entrenos con aproximación'],
     ['Hábitos', 'core', 10, '🎯', 'Core de acero', '10 entrenos con core'],
     ['Hábitos', 'rated', 10, '🧘', 'Escucha tu cuerpo', 'Valora tu energía en 10 entrenos'],
-    ['Hábitos', 'measures', 3, '📏', 'Cinta métrica', 'Anota tus medidas 3 veces'],
   ].map(([group, metric, target, icon, name, desc]) => ({ id: `${metric}-${target}`, group, metric, target, icon, name, desc }));
 
   function medals() {
-    const v = { workouts: 0, streak: 0, perfect: 0, prs: 0, prDay: 0, dayKg: 0, totalKg: 0, warmup: 0, core: 0, rated: 0, measures: 0 };
+    const v = { workouts: 0, streak: 0, perfect: 0, prs: 0, prDay: 0, dayKg: 0, totalKg: 0, warmup: 0, core: 0, rated: 0 };
     const got = {};
     const check = (ts) => MEDALS.forEach(m => { if (!got[m.id] && v[m.metric] >= m.target) got[m.id] = ts; });
     const best = {};
@@ -339,7 +399,6 @@
       if (m >= monthKey(Date.now()) || list.length < weeksInMonth(m) || list.some(x => !x.done)) return;
       v.perfect++; check(list[list.length - 1].at);
     });
-    measures().forEach((x, i) => { v.measures = i + 1; check(dts(x.d)); });
     return { got, v, count: Object.keys(got).length };
   }
   // Medallas nuevas conseguidas justo con este entreno.
@@ -685,6 +744,7 @@
   // cuenta 1 para "Espalda", no 1,5.
   function exShare(exId) {
     const ex = Store.exercise(exId), s = {}, g = m => VOL_GROUP[m] || m;
+    if (ex.pattern === 'mobility') return s; // la movilidad no suma series
     ex.secondary.forEach(m => { s[g(m)] = Math.max(s[g(m)] || 0, 0.5); });
     ex.primary.forEach(m => { s[g(m)] = 1; });
     return s;
@@ -724,6 +784,63 @@
       <p class="muted small">${VOL_NOTE}${plan ? ' La rayita marca lo que prevé tu rutina.' : ''}</p>${bars}</details>` : '';
   }
 
+  // ---------- progreso por grupo muscular ----------
+  // Semana a semana: series hechas del grupo, o su fuerza = media del 1RM estimado de cada ejercicio
+  // en el que el grupo es principal, respecto a su primera sesión (100). Solo ejercicios con peso
+  // y hechos en las últimas 6 semanas, para que uno abandonado no congele la media.
+  const PG_WEEKS = 12, PG_ORDER = ['Glúteo', 'Cuádriceps', 'Isquios', 'Espalda', 'Pecho', 'Hombro', 'Bíceps', 'Tríceps', 'Gemelos', 'Aductores', 'Abdomen', 'Lumbar'];
+  function groupProgress(group) {
+    const ws = S().workouts.filter(w => w.type !== 'hiit').sort((a, b) => a.start - b.start);
+    const now = weekStart(Date.now()), from = addWeeks(now, -(PG_WEEKS - 1));
+    const base = {}, last = {}, out = [];
+    let i = 0;
+    for (let k = weekStart(ws[0]?.start || now); k <= now; k = addWeeks(k, 1)) {
+      const end = addWeeks(k, 1);
+      let sets = 0;
+      for (; i < ws.length && ws[i].start < end; i++) {
+        const w = ws[i];
+        w.exercises.forEach(e => {
+          const sh = exShare(e.exId)[group];
+          if (!sh) return;
+          sets += sh * e.sets.filter(s => s.done !== false).length;
+          if (sh < 1 || w.type === 'descarga' || ['goma', 'tiempo'].includes(Store.exSettings(e.exId).mode)) return;
+          const v = Progression.bestE1rm(e.sets.filter(s => s.done));
+          if (v > 0) { base[e.exId] = base[e.exId] || v; last[e.exId] = { v, t: w.start }; }
+        });
+      }
+      const live = Object.keys(last).filter(id => last[id].t >= addWeeks(end, -6));
+      const str = live.length ? live.reduce((a, id) => a + last[id].v / base[id], 0) / live.length * 100 : null;
+      if (k >= from) out.push({ k, sets, str, n: live.length });
+    }
+    return out;
+  }
+  function groupProgressCard() {
+    const has = PG_ORDER.filter(g => S().workouts.some(w => w.type !== 'hiit' && w.exercises.some(e => exShare(e.exId)[g])));
+    if (!has.length) return '';
+    const g = has.includes(ui.pg) ? ui.pg : has[0], metric = ui.pm || 'sets';
+    const weeks = groupProgress(g).filter((x, i, a) => a.slice(0, i + 1).some(y => y.sets)); // desde la primera semana con datos
+    const chips = has.map(x => `<button class="chip ${x === g ? 'on' : ''}" data-act="pg-group" data-v="${x}">${x}</button>`).join('');
+    const tabs = [['sets', 'Series / semana'], ['str', 'Fuerza']].map(([k, t]) => `<button class="seg-btn ${k === metric ? 'on' : ''}" data-act="pg-metric" data-v="${k}">${t}</button>`).join('');
+    const wk = ts => `Semana del ${new Date(ts).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+    let body;
+    if (metric === 'sets') {
+      const avg = list => list.length ? list.reduce((a, x) => a + x.sets, 0) / list.length : 0;
+      // La semana en curso va a medias: solo semanas completas.
+      const full = weeks.filter(x => x.k < weekStart(Date.now())), recent = full.slice(-4), before = full.slice(-8, -4);
+      body = full.length < 2 ? '<p class="muted small">Con dos semanas de entrenos verás la evolución.</p>'
+        : `<p class="small">Media de las últimas ${recent.length} semanas: <b>${fmtNum(avg(recent))} series</b>${before.length ? ` · las ${before.length} anteriores: ${fmtNum(avg(before))}` : ''}</p>
+          ${lineChart(full.map(x => ({ x: x.k, y: x.sets, tip: `${wk(x.k)} · ${fmtNum(x.sets)} series` })), v => fmtNum(v))}`;
+    } else {
+      const pts = weeks.filter(x => x.str);
+      const lastP = pts[pts.length - 1], pct = lastP ? Math.round(lastP.str - 100) : 0;
+      body = pts.length < 2 ? `<p class="muted small">Aún no hay suficientes sesiones con peso de ${g.toLowerCase()} para dibujar la fuerza.</p>`
+        : `<p class="small">${pct ? `<b>${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)} %</b> respecto a tu primera sesión` : 'Igual que en tu primera sesión'} · media de ${lastP.n} ${lastP.n === 1 ? 'ejercicio' : 'ejercicios'}</p>
+          ${lineChart(pts.map(x => ({ x: x.k, y: x.str, tip: `${wk(x.k)} · ${x.str >= 100 ? "+" : ""}${fmtNum(x.str - 100)} %`, sub: `${x.n} ${x.n === 1 ? 'ejercicio' : 'ejercicios'}` })), v => `${v >= 100 ? '+' : ''}${fmtNum(v - 100)} %`)}`;
+    }
+    return `<div class="card group-prog"><h3>📈 Progreso por grupo muscular</h3><div class="chips scroll">${chips}</div><div class="seg">${tabs}</div>${body}
+      <p class="muted small">${metric === 'sets' ? `Semanas completas, hasta 12. Principal 1 serie, secundario ½.` : '1RM estimado de cada ejercicio de este grupo frente a su primera sesión (100 = como empezaste). Sube aunque cambies de peso o reps.'}</p></div>`;
+  }
+
   // Selector de ejercicios: para rutinas (añadir/cambiar) o para el entreno en curso.
   let pickerCtx = null;
   function viewPicker(rid, di, xi) {
@@ -743,7 +860,8 @@
     const brands = ['all', ...Generator.BRANDS, ...(S().customExercises.length ? ['Mis máquinas'] : [])];
     return `<div class="filters"><input id="q" type="search" placeholder="Buscar máquina o ejercicio…" value="${esc(ui.q)}">
       <div class="chips">${brands.map(b => `<button class="chip ${ui.brand === b ? 'on' : ''}" data-act="f-brand" data-v="${b}">${b === 'all' ? 'Todas' : b}</button>`).join('')}</div>
-      <select id="f-muscle"><option value="all">Todos los músculos</option>${MUSCLES.map(m => `<option ${ui.muscle === m ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <div class="filter-row"><select id="f-muscle"><option value="all">Todos los músculos</option>${MUSCLES.map(m => `<option ${ui.muscle === m ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <select id="f-load"><option value="all">Todo el material</option>${Object.entries(LOAD_TYPES).map(([k, v]) => `<option value="${k}" ${ui.load === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       ${withPattern ? `<label class="check-row"><input type="checkbox" id="f-same" ${ui.samePattern ? 'checked' : ''}> Solo alternativas del mismo patrón</label>` : ''}</div>`;
   }
 
@@ -753,6 +871,7 @@
       (!pickerCtx || !excluded().includes(e.id)) &&
       (ui.brand === 'all' || e.brand === ui.brand || (ui.brand === 'Mis máquinas' && e.custom)) &&
       (ui.muscle === 'all' || e.primary.includes(ui.muscle) || e.secondary.includes(ui.muscle)) &&
+      (ui.load === 'all' || e.load === ui.load) &&
       (!pickerCtx || !pickerCtx.pattern || !ui.samePattern || e.pattern === pickerCtx.pattern) &&
       (!q || `${e.name} ${e.brand} ${e.line} ${PATTERNS[e.pattern]} ${e.primary.join(' ')}`.toLowerCase().includes(q)));
   }
@@ -1178,8 +1297,8 @@
     const m = monthStats(monthKey(Date.now())), waist = series('waist').pop();
     const links = `<div class="link-grid"><a class="card nudge" href="#/mes"><b>📅 ${monthName(monthKey(Date.now()))[0].toUpperCase() + monthName(monthKey(Date.now())).slice(1)}</b>
         <small>${m.ws.length} ${m.ws.length === 1 ? 'entreno' : 'entrenos'} · resumen</small></a>
-      <a class="card nudge" href="#/medidas"><b>📏 Medidas</b><small>${waist ? `Cintura ${fmtNum(waist.v)} cm` : 'Anota tu cintura'}</small></a></div>`;
-    return links + weekVolumeCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
+      <a class="card nudge" href="#/medidas"><b>📏 Medidas</b><small>${waist ? `Cintura ${fmtNum(waist.v)} cm` : 'Cintura, peso…'}</small></a></div>`;
+    return links + weekVolumeCard() + groupProgressCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
       const kg = Nutrition.lifted(w);
       return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
         <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
@@ -1293,6 +1412,9 @@
       <div class="card"><h2>Ajustes</h2>
       <label>Descanso por defecto (s)<input type="number" id="s-rest" value="${S().settings.restDefault}"></label>
       <label class="check-row"><input type="checkbox" id="s-awake" ${S().settings.keepAwake !== false ? 'checked' : ''}> Mantener la pantalla encendida durante el entreno</label></div>
+      <details class="card howto"><summary><b>💡 Cómo sacarle partido</b><small>Consejos rápidos de uso</small></summary>
+        ${HOWTO.map(([i, t, d]) => `<div class="howto-row"><span class="howto-ic">${i}</span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</details>
+      <details class="card news"><summary><b>✨ Novedades</b><small>Lo último que ha llegado a la app</small></summary>${newsHTML(NEWS)}</details>
       <a class="card row between" href="#/medidas"><div class="grow"><b>📏 Medidas corporales</b><small>Cintura, peso, cadera, muslo: lo que quieras</small></div><span class="chev">›</span></a>
       <div class="card"><h3>Material de mi gimnasio</h3><p class="muted small">Marcas que salen en las alternativas, el generador y los entrenos rápidos.</p>
         ${Generator.BRANDS.map(b => `<label class="check-row"><input type="checkbox" class="s-brand" value="${b}" ${(S().profile?.brands || Generator.BRANDS).includes(b) ? 'checked' : ''}> ${b === 'Genérico' ? 'Peso libre, poleas, gomas y multipower' : b}</label>`).join('')}</div>
@@ -1599,6 +1721,8 @@
     },
     'open-ex': el => go('#/ejercicio/' + el.dataset.id),
     'f-brand': el => { ui.brand = el.dataset.v; render(true); },
+    'pg-group': el => { ui.pg = el.dataset.v; render(true); },
+    'pg-metric': el => { ui.pm = el.dataset.v; render(true); },
     'save-custom': () => {
       const name = document.getElementById('n-name').value.trim();
       if (!name) return toast('Ponle un nombre.');
@@ -1655,9 +1779,8 @@
     },
     'add-core': () => {
       const w = S().activeWorkout, n = S().workouts.length;
-      const pool = CORE.filter(id => !excluded().includes(id) && Store.allExercises().some(e => e.id === id));
-      const picks = [0, 1, 2].map(i => pool[(n + i) % pool.length]);
-      picks.forEach(id => w.exercises.push(newWorkoutEx(id, { sets: 2, repMin: 10, repMax: 15, rir: 2, rest: 45 })));
+      const picks = CORE.map(g => g.filter(id => !excluded().includes(id) && !w.exercises.some(e => e.exId === id))).filter(g => g.length).map(g => g[n % g.length]);
+      picks.forEach(id => w.exercises.push(newWorkoutEx(id, { sets: 2, repMin: 10, repMax: 15, rir: 2, rest: 45, secs: 30 })));
       w.coreAsked = true; save(); render(true); toast('Core añadido al final 🎯');
     },
     'skip-core': () => { S().activeWorkout.coreAsked = true; save(); render(true); },
@@ -1731,22 +1854,21 @@
     'timer-stop': () => Timer.stop(),
     export: () => { exportBackup(); render(true); },
     'backup-later': () => { S().settings.backupNag = Date.now(); save(); render(true); },
+    'news-ok': () => {
+      S().settings.seenNews = NEWS[0].v; save();
+      const bg = document.querySelector('.sheet-bg'); bg.classList.remove('show'); setTimeout(() => bg.remove(), 250);
+    },
     'save-measure': () => {
       const d = document.getElementById('m-date').value, entry = {};
       if (!d || d > ymd(Date.now())) return toast('Elige una fecha que no sea futura.');
       Object.keys(METRICS).forEach(k => { const v = document.getElementById('m-' + k).value; if (v !== '' && Number(v) > 0) entry[k] = Number(v); });
       if (!Object.keys(entry).length) return toast('Rellena al menos una medida.');
-      const before = medals().got;
       const list = S().measures = S().measures || [], same = list.find(m => m.d === d);
       if (same) Object.assign(same, entry); else list.push(Object.assign({ d }, entry));
       // El peso más reciente alimenta el cálculo de calorías y proteína.
       const lw = series('weight').pop();
       if (lw) S().settings.bodyweight = lw.v;
-      save();
-      const fresh = MEDALS.filter(m => medals().got[m.id] && !before[m.id]);
-      toast(fresh.length ? `🏅 ¡Medalla nueva: ${fresh.map(m => m.name).join(', ')}!` : '📏 Medidas guardadas');
-      if (fresh.length) confetti();
-      render(true);
+      save(); toast('📏 Medidas guardadas'); render(true);
     },
     'del-measure': el => {
       if (!confirm(`¿Borrar las medidas del ${Cycle.fmt(el.dataset.d)}?`)) return;
@@ -1767,7 +1889,7 @@
       else go('#/rutinas');
       render();
     },
-    'switch-user': el => { Store.switchUser(el.dataset.id); Timer.stop(); Store.migrate(); toast(`Perfil: ${Store.currentUser().name}`); go('#/'); render(); },
+    'switch-user': el => { Store.switchUser(el.dataset.id); Timer.stop(); Store.migrate(); toast(`Perfil: ${Store.currentUser().name}`); go('#/'); render(); checkNews(); },
     'rename-user': el => {
       const name = prompt('Nuevo nombre', Store.currentUser().name);
       if (name && name.trim()) { Store.updateUser(el.dataset.id, { name: name.trim() }); render(true); }
@@ -1843,6 +1965,7 @@
     }
     else if (d.photo && t.files[0]) savePhoto(d.photo, t.files[0]);
     else if (t.id === 'f-muscle') { ui.muscle = t.value; document.getElementById('list').innerHTML = listHTML(pickerCtx ? 'pick' : 'open-ex'); }
+    else if (t.id === 'f-load') { ui.load = t.value; document.getElementById('list').innerHTML = listHTML(pickerCtx ? 'pick' : 'open-ex'); }
     else if (t.id === 'f-same') { ui.samePattern = t.checked; document.getElementById('list').innerHTML = listHTML('pick'); }
     else if (t.classList.contains('s-brand')) {
       const brands = [...document.querySelectorAll('.s-brand:checked')].map(i => i.value);
@@ -1888,6 +2011,7 @@
 
   if (Store.currentUser()) Store.migrate();
   render();
+  if (Store.currentUser()) checkNews();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js');

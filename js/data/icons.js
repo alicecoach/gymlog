@@ -26,6 +26,7 @@ const Icons = (() => {
     core: m(l('3,53', '61,53')) + head(10, 44) + l('16,47', '36,47', '44,32', '55,32') + l('22,47', '24,28'),
     power: head(32, 8) + l('32,14', '32,32') + l('22,6', '32,18', '42,6') + l('32,32', '23,40', '28,48') + l('32,32', '41,40', '36,48') + m(l('12,57', '22,57') + l('28,60', '36,60') + l('42,57', '52,57')),
     balance: head(30, 8) + l('30,14', '30,34') + l('11,22', '49,22') + l('30,34', '30,58') + l('30,34', '45,40', '53,48'),
+    mobility: m(l('3,58', '61,58')) + head(27, 18) + l('29,24', '34,40') + l('34,40', '50,46', '50,57') + l('34,40', '18,50', '6,57') + l('31,29', '44,8') + l('31,29', '22,44'),
     cardio: head(39, 8) + l('37,14', '30,33') + l('18,16', '25,23', '35,18', '45,24', '49,18') + l('30,33', '41,42', '36,56') + l('30,33', '20,41', '9,40'),
   };
 
@@ -34,7 +35,7 @@ const Icons = (() => {
     press_horizontal: 'push', press_incline: 'push', press_vertical: 'push', fly: 'push', lateral_raise: 'push', triceps: 'push',
     pull_vertical: 'pull', row: 'pull', rear_delt: 'pull', biceps: 'pull',
     squat: 'legs', knee_ext: 'legs', knee_flex: 'legs', calf: 'legs', adduction: 'legs',
-    hinge: 'glute', abduction: 'glute', core: 'core', power: 'power', balance: 'power', cardio: 'power',
+    hinge: 'glute', abduction: 'glute', core: 'core', mobility: 'core', power: 'power', balance: 'power', cardio: 'power',
   };
 
   const svg = pattern => `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[pattern] || P.core}</svg>`;

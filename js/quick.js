@@ -6,6 +6,7 @@ const Quick = (() => {
     hiit: { icon: '🔥', label: 'HIIT', desc: 'Intervalos 40/20 · ~20 min', grad: 'power' },
     pierna: { icon: '🦵', label: 'Solo pierna', desc: 'Cuádriceps, glúteo y femoral', grad: 'legs' },
     potencia: { icon: '🤸', label: 'Potencia y equilibrio', desc: 'Explosividad y estabilidad', grad: 'glute' },
+    movilidad: { icon: '🐾', label: 'Movilidad y Animal Flow', desc: 'Sin material · ~20 min', grad: 'core' },
     descarga: { icon: '🔋', label: 'Descarga', desc: 'Tu próximo día, suave', grad: 'core' },
   };
 
@@ -37,7 +38,7 @@ const Quick = (() => {
 
   const FIXED = (list) => list
     .filter(([id]) => !excluded().includes(id))
-    .map(([exId, sets, repMin, repMax, rir, rest, note]) => ({ exId, target: { sets, repMin, repMax, rir, rest }, ref: { note } }));
+    .map(([exId, sets, repMin, repMax, rir, rest, note, secs]) => ({ exId, target: { sets, repMin, repMax, rir, rest, secs }, ref: { note } }));
 
   function build(type, routine, nextDay) {
     switch (type) {
@@ -58,9 +59,23 @@ const Quick = (() => {
           ['g-kb-swing', 3, 10, 12, 3, 75, 'Bisagra de cadera, espalda neutra. ⚠️ Si molesta la lumbar, cámbialo.'],
           ['g-skater', 3, 6, 8, 3, 60, 'Por lado. Aguanta 1 s el aterrizaje sin perder el equilibrio.'],
           ['g-sl-rdl', 3, 8, 10, 2, 60, 'Por pierna. Lento y controlado, cadera nivelada.'],
-          ['g-step-up', 3, 6, 8, 3, 60, 'Sube explosivo, baja en 3 s.'],
+          ['af-traveling-ape', 3, 4, 6, 3, 60, 'Animal Flow. 4 pasos a cada lado: caderas bajas, manos al suelo y salto lateral suave.'],
           ['g-sl-reach', 2, 8, 10, 2, 45, 'Por pierna. Alcanza en 3 direcciones sin apoyar el otro pie.'],
           ['g-pallof', 2, 10, 12, 2, 45, 'Por lado. Resiste la rotación.'],
+        ]);
+      case 'movilidad':
+        // Circuito suave: cuadrupedias y transiciones de Animal Flow con apoyo en manos (nunca en codos).
+        return FIXED([
+          ['af-wrist-prep', 1, 10, 10, 3, 20, 'Círculos y balanceos de muñeca en cuadrupedia: prepara el apoyo en manos.'],
+          ['g-cat-cow', 1, 8, 10, 3, 20, 'Lento, siguiendo la respiración.'],
+          ['af-beast-hold', 3, 0, 0, 3, 30, 'Rodillas a 2–3 cm del suelo, espalda plana, empuja el suelo con las manos.', 20],
+          ['af-loaded-beast', 2, 6, 8, 3, 30, 'Desde beast, lleva la cadera atrás hacia los talones y vuelve.'],
+          ['af-crab-reach', 2, 4, 6, 3, 30, 'Por lado. Empuja con la cadera hacia el techo y alcanza por encima.'],
+          ['af-side-kick', 2, 4, 6, 3, 30, 'Por lado. Desde beast, gira y pasa la pierna por debajo, sin prisa.'],
+          ['af-scorpion', 2, 4, 6, 3, 30, 'Por lado. Desde beast, lleva el pie hacia la mano contraria por encima.'],
+          ['af-ape-reach', 2, 4, 6, 3, 30, 'Sentadilla profunda: caderas bajas y alcance largo hacia delante.'],
+          ['g-90-90', 1, 6, 8, 3, 20, 'Por lado. Pecho alto al cambiar de lado.'],
+          ['g-worlds-greatest', 1, 4, 5, 3, 20, 'Por lado. Zancada, mano por dentro del pie y rotación hacia el techo.'],
         ]);
       case 'hiit':
         return FIXED([

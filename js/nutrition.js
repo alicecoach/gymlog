@@ -35,7 +35,7 @@ const Nutrition = (() => {
   // Demanda de glucógeno de la sesión.
   function demand(w) {
     if (['hiit', 'pierna', 'fullbody'].includes(w.type)) return 'alta';
-    if (['descarga', 'potencia'].includes(w.type)) return 'baja';
+    if (['descarga', 'potencia', 'movilidad'].includes(w.type)) return 'baja';
     let legs = 0, all = 0;
     w.exercises.forEach(e => {
       const n = e.sets.length; all += n;
