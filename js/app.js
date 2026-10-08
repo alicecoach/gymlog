@@ -13,6 +13,7 @@
   let swapOpen = null; // ejercicio del entreno con el panel de alternativas abierto
   let holdOn = null;   // serie por tiempo con la cuenta atrás en marcha ("ei-si")
   let memoOpen = null; // ejercicio del entreno con el panel de molestias/anotación abierto
+  let demoOpen = null; // ejercicio del entreno con la ilustración de técnica abierta
   let celebrate = null; // id del entreno recién terminado, para lanzar el confeti una sola vez
 
   const TIPS = [
@@ -27,6 +28,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 6, date: '2026-10-08', items: [
+      '🎬 <b>Cómo se hace</b>: unos 140 ejercicios traen una ilustración animada de la técnica (posición inicial y final). Está en su ficha y, durante el entreno, en «🎬 Cómo se hace».',
+      '▶️ Y en <b>todos</b> los ejercicios, un enlace para ver vídeos de la técnica.',
+    ] },
     { v: 5, date: '2026-10-08', items: [
       '🏠 <b>Full body sin material</b>: nuevo entreno rápido de calistenia (~35 min) para casa, el parque o de viaje.',
       '📈 En los ejercicios sin peso, cuando llegues al tope de reps la app te propone ponerlo más difícil (tempo, pausa o variante) en vez de subir kilos.',
@@ -79,6 +84,7 @@
     ['⇄', '¿Máquina ocupada?', 'Toca ⇄ en el ejercicio: alternativas que trabajan lo mismo, solo para hoy.'],
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
     ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
+    ['🎬', 'Cómo se hace', 'Toca «🎬 Cómo se hace» en el entreno o abre la ficha del ejercicio: ilustración de la técnica y vídeos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
     ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «Registrar un entreno de otro día». Desde cada resumen puedes corregir pesos y fechas.'],
@@ -133,6 +139,16 @@
     return pool.slice().sort((a, b) => a.last - b.last || a.i - b.i)[0].i;
   }
   const trainedToday = () => S().workouts.some(w => daysAgo(w.start) === 0);
+  // Técnica: ilustración animada (inicio ↔ final) si la hay, y búsqueda de vídeo para cualquier ejercicio.
+  function demoHTML(exId) {
+    const ek = DEMOS[exId];
+    return ek ? `<div class="demo" role="img" aria-label="Cómo se hace: posición inicial y final"><img src="img/ek/${ek}-a.png" alt="" loading="lazy"><img class="b" src="img/ek/${ek}-b.png" alt="" loading="lazy"></div>
+      <small class="demo-credit">Ilustración: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> · CC BY-SA 4.0</small>` : '';
+  }
+  function videoLink(exId) {
+    const ex = Store.exercise(exId), q = `${ex.name}${ex.line === 'Animal Flow' ? ' animal flow' : ex.brand && ex.brand !== 'Genérico' ? ' ' + ex.brand : ''} técnica`;
+    return `<a class="btn small ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(q)}" target="_blank" rel="noopener">▶️ Ver vídeos de la técnica</a>`;
+  }
   function thumb(exId, cls = '') {
     const p = S().photos[exId];
     return p ? `<div class="pict photo ${cls}"><img src="${p}" alt=""></div>` : Icons.tile(Store.exercise(exId).pattern, cls);
@@ -913,6 +929,7 @@
       ${photo ? `<button class="btn small ghost" data-act="del-photo" data-id="${id}">Quitar foto</button>` : ''}
       ${ex.custom ? `<button class="btn small ghost danger" data-act="del-custom" data-id="${id}">Borrar máquina</button>` : ''}
       <button class="btn small ghost" data-act="toggle-excl" data-id="${id}">${excluded().includes(id) ? '✅ Volver a permitir' : '⛔ Evitar este ejercicio'}</button></div></div>
+      <div class="card demo-card"><h3>🎬 Cómo se hace</h3>${demoHTML(id)}<div class="row gap demo-links">${videoLink(id)}</div></div>
       <div class="card"><h3>Carga</h3><div class="rx-fields two">
         <label>Cómo anoto el peso<select data-exs="mode" data-id="${id}">${Object.entries(Store.MODES).map(([k, v]) => `<option value="${k}" ${st.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}</div>
@@ -1088,6 +1105,8 @@
       <div class="target">${st.mode === 'tiempo' ? `<span>${t.sets} × ${fmtRest(Number(t.secs) || 30)}</span>`
         : `<span>${t.sets} × ${t.repMin}–${t.repMax}</span><span>RIR ${t.rir}</span>`}<span>⏱ ${fmtRest(t.rest)}</span></div>
       ${e.note ? `<div class="note">📝 ${esc(e.note)}</div>` : ''}
+      ${demoOpen === ei ? `<div class="demo-inline">${demoHTML(e.exId)}<div class="row gap demo-links">${videoLink(e.exId)}<button class="btn small ghost" data-act="demo-open" data-ei="${ei}">Ocultar</button></div></div>`
+        : `<button class="demo-btn" data-act="demo-open" data-ei="${ei}">🎬 Cómo se hace</button>`}
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>
       <div class="prev">Anterior: ${esc(prevTxt)}</div>${warm}
       <table class="sets ${st.mode === 'tiempo' ? 'hold' : st.mode === 'goma' ? 'band' : ''}">${setRows(e, ei, st.mode)}</table>
@@ -1435,7 +1454,7 @@
       <div class="row gap"><button class="btn" data-act="export">Exportar</button>
       <label class="btn file-btn">Importar<input type="file" accept="application/json,.json" id="import" hidden></label></div></div>
       <div class="card"><button class="btn ghost danger" data-act="reset">Borrar los datos de ${esc(u.name)}</button></div>
-      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Pictogramas propios.</p>`;
+      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Pictogramas propios. Ilustraciones de técnica: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (CC BY-SA 4.0).</p>`;
   }
 
   // ---------- usuarios ----------
@@ -1536,7 +1555,7 @@
       requestAnimationFrame(step);
     });
   }
-  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; render(false); });
+  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; render(false); });
 
   // Pantalla encendida mientras hay un entreno en curso (no en los de días pasados).
   let wakeLock = null, wakeBusy = false;
@@ -1770,6 +1789,7 @@
     'del-set': el => { const sets = S().activeWorkout.exercises[el.dataset.ei].sets; if (sets.length > 1) sets.pop(); save(); render(true); },
     'swap-open': el => { const i = Number(el.dataset.ei); swapOpen = swapOpen === i ? null : i; memoOpen = null; render(true); },
     'memo-open': el => { const i = Number(el.dataset.ei); memoOpen = memoOpen === i ? null : i; swapOpen = null; render(true); },
+    'demo-open': el => { const i = Number(el.dataset.ei); demoOpen = demoOpen === i ? null : i; render(true); },
     pain: el => {
       const e = S().activeWorkout.exercises[el.dataset.ei], p = el.dataset.p, on = e.pain || [];
       e.pain = on.includes(p) ? on.filter(x => x !== p) : on.concat(p);
