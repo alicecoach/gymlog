@@ -27,6 +27,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 4, date: '2026-10-08', items: [
+      '💪 <b>Más ejercicios</b>: fondos en banco y en máquina, press francés, flexiones diamante, planchas sobre antebrazo, silla romana…',
+      '⛔ ¿Alguno no te va bien? En su ficha, <b>Evitar este ejercicio</b>: no te saldrá en rutinas generadas, alternativas, entrenos rápidos ni en el core del final.',
+    ] },
     { v: 3, date: '2026-10-08', items: [
       '📈 <b>Progreso por grupo muscular</b> en Historial: series por semana y fuerza de glúteo, espalda, pecho…',
       '🏋️ <b>Más de 100 ejercicios nuevos</b> con mancuernas, kettlebell, banco, goma y sin material para todos los grupos.',
@@ -77,15 +81,16 @@
     ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
     ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],
     ['💾', 'Copia de seguridad', 'Tus datos viven solo en este móvil. Exporta una vez al mes y guárdala en Drive.'],
+    ['⛔', 'Ejercicios a evitar', 'Si uno no te va bien (lesión, molestia), en su ficha toca «Evitar»: no te saldrá en rutinas generadas, alternativas ni entrenos rápidos.'],
     ['👥', 'Varias personas', 'Toca tu avatar arriba para añadir a otra persona: cada una con sus rutinas e historial.'],
   ];
 
   // Remate de core: uno de cada tipo (flexión / anti-extensión, rotación / anti-rotación, lateral), rotando entre entrenos.
-  // Sin apoyo de codos.
+  // Respeta los ejercicios que cada perfil marca como ⛔ Evitar (p. ej. planchas sobre antebrazos).
   const CORE = [
-    ['g-dead-bug', 'g-cable-crunch', 'g-reverse-crunch', 'g-weighted-situp', 'g-high-plank', 'hss-ab-crunch', 'g-hollow', 'af-beast-hold', 'g-bird-dog'],
+    ['g-dead-bug', 'g-cable-crunch', 'g-reverse-crunch', 'g-weighted-situp', 'g-high-plank', 'hss-ab-crunch', 'g-hollow', 'g-plank', 'af-beast-hold', 'g-bird-dog'],
     ['g-pallof', 'g-russian-twist', 'g-cable-woodchop', 'g-bicycle', 'g-cable-pallof', 'af-side-kick'],
-    ['g-kb-side-bend', 'g-side-plank-hand', 'g-suitcase-carry', 'g-heel-touch', 'g-db-side-bend'],
+    ['g-kb-side-bend', 'g-side-plank-hand', 'g-suitcase-carry', 'g-side-plank', 'g-heel-touch', 'g-db-side-bend'],
   ];
 
   // ---------- helpers de datos ----------
@@ -1018,7 +1023,7 @@
     const hasCore = w.exercises.some(e => Store.exercise(e.exId).pattern === 'core');
     if (!hasCore && !w.coreAsked && ['rutina', 'fullbody', 'pierna', 'torso'].includes(w.type || 'rutina')) {
       h += `<div class="card core-offer"><div class="pict g-core sm">${Icons.svg('core')}</div><div class="grow"><b>¿Cierras con core?</b>
-        <small>3 ejercicios · ~6 min · sin apoyar codos</small></div>
+        <small>3 ejercicios · ~6 min</small></div>
         <div class="row gap"><button class="btn small primary" data-act="add-core">Añadir</button><button class="btn small ghost" data-act="skip-core">Hoy no</button></div></div>`;
     }
     h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a>

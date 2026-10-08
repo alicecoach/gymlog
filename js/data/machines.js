@@ -332,6 +332,20 @@ const MACHINES = (() => {
   G('g-band-dislocate', 'Dislocaciones de hombro con goma', 'mobility', 'band', ['Hombro']);
   G('g-hamstring-flow', 'Bisagra con alcance (movilidad de isquios)', 'mobility', 'bodyweight', ['Isquios']);
 
+  // Con apoyo de codos o carga en el codo flexionado (cada perfil puede marcarlos como ⛔ Evitar)
+  G('g-bench-dips', 'Fondos en banco', 'triceps', 'bodyweight', ['Tríceps'], ['Pecho', 'Hombro']);
+  G('g-machine-dip', 'Fondos en máquina', 'triceps', 'stack', ['Tríceps'], ['Pecho']);
+  G('g-diamond-pushup', 'Flexiones diamante', 'triceps', 'bodyweight', ['Tríceps'], ['Pecho']);
+  G('g-close-pushup', 'Flexiones cerradas', 'press_horizontal', 'bodyweight', ['Pecho', 'Tríceps'], ['Hombro']);
+  G('g-db-skull', 'Press francés con mancuernas', 'triceps', 'dumbbell', ['Tríceps']);
+  G('g-ez-skull', 'Press francés con barra Z', 'triceps', 'barbell', ['Tríceps']);
+  G('g-side-plank', 'Plancha lateral sobre antebrazo', 'core', 'hold', ['Abdomen'], [], { unilateral: true });
+  G('g-rkc-plank', 'Plancha RKC (antebrazos, máxima tensión)', 'core', 'hold', ['Abdomen'], ['Glúteo']);
+  G('g-plank-saw', 'Plancha con balanceo (plank saw)', 'core', 'bodyweight', ['Abdomen']);
+  G('g-plank-updown', 'Plancha arriba-abajo (antebrazos a manos)', 'core', 'bodyweight', ['Abdomen'], ['Tríceps', 'Hombro']);
+  G('g-captain-chair', 'Elevación de rodillas en silla romana', 'core', 'bodyweight', ['Abdomen']);
+  G('g-copenhagen-elbow', 'Plancha Copenhague sobre antebrazo', 'adduction', 'hold', ['Aductores'], ['Abdomen'], { unilateral: true });
+
   // ---------- Animal Flow ----------
   // Cuadrupedias y transiciones: fuerza, potencia y movilidad sin material. Apoyo en manos, nunca en codos.
   const AF = (...a) => add('Genérico', 'Animal Flow', ...a);
