@@ -2,6 +2,7 @@
 const Quick = (() => {
   const TYPES = {
     fullbody: { icon: '⚡', label: 'Full body', desc: 'Todo el cuerpo en ~35 min', grad: 'push' },
+    calistenia: { icon: '🏠', label: 'Full body sin material', desc: 'Calistenia · ~35 min', grad: 'legs' },
     torso: { icon: '💪', label: 'Tren superior', desc: 'Pecho, espalda, hombro y brazos', grad: 'pull' },
     hiit: { icon: '🔥', label: 'HIIT', desc: 'Intervalos 40/20 · ~20 min', grad: 'power' },
     pierna: { icon: '🦵', label: 'Solo pierna', desc: 'Cuádriceps, glúteo y femoral', grad: 'legs' },
@@ -36,6 +37,9 @@ const Quick = (() => {
     }).filter(Boolean);
   }
 
+  // Cada hueco: el primer ejercicio de la lista que no esté en ⛔ Evitar.
+  const SLOTS = list => list.map(([ids, ...rest]) => [ids.find(id => !excluded().includes(id)), ...rest]).filter(([id]) => id);
+
   const FIXED = (list) => list
     .filter(([id]) => !excluded().includes(id))
     .map(([exId, sets, repMin, repMax, rir, rest, note, secs]) => ({ exId, target: { sets, repMin, repMax, rir, rest, secs }, ref: { note } }));
@@ -63,6 +67,19 @@ const Quick = (() => {
           ['g-sl-reach', 2, 8, 10, 2, 45, 'Por pierna. Alcanza en 3 direcciones sin apoyar el otro pie.'],
           ['g-pallof', 2, 10, 12, 2, 45, 'Por lado. Resiste la rotación.'],
         ]);
+      case 'calistenia':
+        // Full body con el peso del cuerpo: pierna, empuje, glúteo, tirón, unilateral, hombro, core y un remate.
+        return FIXED(SLOTS([
+          [['g-air-squat', 'g-jump-squat', 'g-wall-sit'], 3, 15, 20, 2, 60, 'Baja en 3 s, espalda neutra. ¿Fácil? Pausa 2 s abajo o pasa a sentadilla con salto.', 45],
+          [['g-pushup', 'g-incline-pushup', 'g-close-pushup'], 3, 8, 15, 2, 75, 'Cuerpo en bloque. ¿No llegas a 8? Manos en un banco o una mesa.'],
+          [['g-sl-glute-bridge', 'g-glute-bridge', 'g-frog-pump'], 3, 10, 15, 2, 60, 'Por pierna. Aprieta el glúteo 1 s arriba.'],
+          [['g-inverted-row', 'g-pullup', 'g-superman'], 3, 8, 12, 2, 75, 'Bajo una mesa firme, una barra baja o un TRX. Sin dónde agarrarte: cámbialo por superman.'],
+          [['g-sl-box-squat', 'g-cossack', 'g-split-jump'], 3, 8, 12, 2, 60, 'Por pierna. Siéntate despacio en un banco o una silla y sube sin impulso.'],
+          [['g-pike-pushup', 'af-traveling-beast', 'g-shoulder-tap'], 3, 6, 10, 2, 60, 'Cadera alta y cabeza hacia el suelo entre las manos. Baja controlada.'],
+          [['g-hollow', 'af-beast-hold', 'g-high-plank'], 3, 0, 0, 2, 45, 'Zona lumbar pegada al suelo; si cuesta, dobla las rodillas.', 30],
+          [['g-bicycle', 'g-heel-touch', 'g-v-up'], 2, 12, 20, 2, 45, 'Por lado, lento y sin tirar del cuello.'],
+          [['g-burpee', 'g-mountain-climber', 'g-high-knees'], 2, 8, 12, 3, 60, 'Ritmo constante y aterrizaje suave. Sin impacto: quita el salto.'],
+        ]));
       case 'movilidad':
         // Circuito suave: cuadrupedias y transiciones de Animal Flow con apoyo en manos (nunca en codos).
         return FIXED([

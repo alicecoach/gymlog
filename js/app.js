@@ -27,6 +27,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 5, date: '2026-10-08', items: [
+      '🏠 <b>Full body sin material</b>: nuevo entreno rápido de calistenia (~35 min) para casa, el parque o de viaje.',
+      '📈 En los ejercicios sin peso, cuando llegues al tope de reps la app te propone ponerlo más difícil (tempo, pausa o variante) en vez de subir kilos.',
+    ] },
     { v: 4, date: '2026-10-08', items: [
       '💪 <b>Más ejercicios</b>: fondos en banco y en máquina, press francés, flexiones diamante, planchas sobre antebrazo, silla romana…',
       '⛔ ¿Alguno no te va bien? En su ficha, <b>Evitar este ejercicio</b>: no te saldrá en rutinas generadas, alternativas, entrenos rápidos ni en el core del final.',
@@ -76,7 +80,7 @@
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
     ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
-    ['⚡', 'Entrenos rápidos', 'Para días raros: full body, HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
+    ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «Registrar un entreno de otro día». Desde cada resumen puedes corregir pesos y fechas.'],
     ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
     ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],

@@ -70,6 +70,8 @@ const Progression = (() => {
     if (mode === 'goma') return suggestBand(hist, target);
     const f = kg => `${Number(kg).toLocaleString('es-ES')} ${label}`;
     if (!hist.length) {
+      if (mode === 'lastre') return { type: 'first', kg: null, reps: target.repMin,
+        msg: `Primera vez: ${target.repMin}–${target.repMax} reps con tu peso dejando ${target.rir} en reserva. Deja el lastre vacío si no usas.` };
       return { type: 'first', kg: null, reps: target.repMin,
         msg: `Primera vez: busca un peso con el que hagas ${target.repMin}–${target.repMax} reps dejando ${target.rir} en reserva.` };
     }
@@ -82,6 +84,9 @@ const Progression = (() => {
     const tooEasy = rirs.length === ws.length && rirs.length > 0 && rirs.every(r => r >= target.rir + 3)
       && ws.every(s => num(s.reps) >= target.repMin);
     if (allTop || tooEasy) {
+      // Sin lastre (calistenia): progresa con una variante más dura o con tempo, no con kilos.
+      if (mode === 'lastre' && w === 0) return { type: 'up', kg: 0, reps: target.repMax,
+        msg: `Llegaste a ${target.repMax} reps con tu peso. Ponlo más difícil: baja en 3–4 s, pausa abajo, una variante más dura o algo de lastre.` };
       const steps = num(ws[0].reps) >= target.repMax + 3 ? 2 : 1;
       const kg = round(w + increment * steps);
       return { type: 'up', kg, reps: target.repMin,
