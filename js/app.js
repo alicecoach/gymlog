@@ -13,6 +13,7 @@
   let swapOpen = null; // ejercicio del entreno con el panel de alternativas abierto
   let holdOn = null;   // serie por tiempo con la cuenta atrás en marcha ("ei-si")
   let memoOpen = null; // ejercicio del entreno con el panel de molestias/anotación abierto
+  let celebrate = null; // id del entreno recién terminado, para lanzar el confeti una sola vez
 
   const TIPS = [
     'Proteína: apunta a 1,6–2,2 g por kg de peso corporal al día.',
@@ -232,27 +233,161 @@
     S().workouts.filter(w => w.start <= until).forEach(w => { const k = weekStart(w.start); (by[k] = by[k] || new Set()).add(startOfDay(w.start)); });
     return k => by[k]?.size || 0;
   }
-  // La semana en curso no rompe la racha: suma cuando la cumples.
-  function streak() {
-    const goal = weekGoal(), cnt = weekDays(), now = weekStart(Date.now());
-    let cur = 0, k = addWeeks(now, -1);
-    while (cnt(k) >= goal) { cur++; k = addWeeks(k, -1); }
-    if (cnt(now) >= goal) cur++;
-    let best = 0, run = 0;
-    const first = S().workouts.reduce((a, w) => Math.min(a, w.start), Infinity);
-    if (first < Infinity) for (let w = weekStart(first); w <= now; w = addWeeks(w, 1)) {
-      run = cnt(w) >= goal ? run + 1 : 0; best = Math.max(best, run);
+  // Comodines: cada mes hay 2. Si una semana ya terminada no llega al objetivo, se gasta uno solo y la racha
+  // sigue (esa semana no suma). La semana en curso no rompe la racha: suma cuando la cumples.
+  const JOKERS = 2;
+  const weekMonth = k => monthKey(k + 3 * 864e5); // el mes de la semana es el de su jueves
+  function streakTimeline() {
+    const goal = weekGoal(), now = weekStart(Date.now()), ws = S().workouts.slice().sort((a, b) => a.start - b.start);
+    const days = {}, doneAt = {};
+    ws.forEach(w => {
+      const k = weekStart(w.start), d = startOfDay(w.start);
+      (days[k] = days[k] || new Set()).add(d);
+      if (days[k].size === goal && !doneAt[k]) doneAt[k] = w.start; // el entreno que completó la semana
+    });
+    const cnt = k => days[k]?.size || 0, used = {}, weeks = [];
+    let run = 0, best = 0;
+    if (ws.length) for (let k = weekStart(ws[0].start); k <= now; k = addWeeks(k, 1)) {
+      const m = weekMonth(k);
+      if (cnt(k) >= goal) { run++; weeks.push({ k, run, done: true, at: doneAt[k] }); }
+      else if (k === now) weeks.push({ k, run, current: true });
+      else if (run && (used[m] || 0) < JOKERS) { used[m] = (used[m] || 0) + 1; weeks.push({ k, run, saved: true }); }
+      else { run = 0; weeks.push({ k, run }); }
+      best = Math.max(best, run);
     }
-    return { cur, best: Math.max(best, cur), goal, week: cnt(now) };
+    return { weeks, cur: run, best, goal, week: cnt(now), jokersLeft: JOKERS - (used[weekMonth(now)] || 0) };
+  }
+  const streak = streakTimeline;
+  function weeksInMonth(m) {
+    const [a, b] = monthRange(m);
+    let n = 0;
+    for (let k = addWeeks(weekStart(a), -1); k < b; k = addWeeks(k, 1)) if (weekMonth(k) === m) n++;
+    return n;
   }
   function streakCard() {
     if (!S().workouts.length) return '';
-    const s = streak(), done = s.week >= s.goal;
+    const s = streak(), done = s.week >= s.goal, lastW = s.weeks[s.weeks.length - 2];
     const dots = Array.from({ length: Math.max(s.goal, s.week) }, (_, i) => `<i class="${i < s.week ? 'on' : ''}"></i>`).join('');
     const title = s.cur ? `${s.cur} ${s.cur === 1 ? 'semana' : 'semanas'} seguidas` : 'Empieza tu racha';
-    const sub = done ? '✅ Semana cumplida' : `${s.week} de ${s.goal} esta semana`;
-    return `<div class="card streak ${s.cur ? 'lit' : ''}"><div class="flame">${s.cur ? '🔥' : '🌱'}</div><div class="grow"><b>${title}</b>
-      <small>${sub}${s.best > s.cur ? ` · récord: ${s.best}` : s.cur >= 2 ? ' · ¡tu mejor racha!' : ''}</small></div><div class="wdots">${dots}</div></div>`;
+    const sub = done ? '✅ Semana cumplida' : lastW?.saved && s.week === 0 ? '🛟 Un comodín salvó la semana pasada' : `${s.week} de ${s.goal} esta semana`;
+    const m = medals();
+    return `<a class="card streak ${s.cur ? 'lit' : ''}" href="#/logros"><div class="flame">${s.cur ? '🔥' : '🌱'}</div><div class="grow"><b>${title}</b>
+      <small>${sub}${s.best > s.cur ? ` · récord: ${s.best}` : s.cur >= 2 ? ' · ¡tu mejor racha!' : ''}</small>
+      <small class="streak-meta"><span class="jokers">${'🛟'.repeat(Math.max(0, s.jokersLeft))}<s>${'🛟'.repeat(JOKERS - Math.max(0, s.jokersLeft))}</s></span> · 🏅 ${m.count}/${MEDALS.length}</small></div>
+      <div class="wdots">${dots}</div></a>`;
+  }
+
+  // ---------- medallas ----------
+  // Cada medalla mira una métrica y un umbral; la fecha es la del entreno (o medida) con que la alcanzaste.
+  const MEDALS = [
+    ['Constancia', 'workouts', 1, '👟', 'Primer paso', 'Tu primer entreno'],
+    ['Constancia', 'workouts', 10, '🚶', 'En marcha', '10 entrenos'],
+    ['Constancia', 'workouts', 25, '📆', 'Hábito', '25 entrenos'],
+    ['Constancia', 'workouts', 50, '🎖️', 'Medio centenar', '50 entrenos'],
+    ['Constancia', 'workouts', 100, '💯', 'Club de los 100', '100 entrenos'],
+    ['Constancia', 'workouts', 200, '👑', 'Leyenda', '200 entrenos'],
+    ['Constancia', 'streak', 4, '🔥', 'Un mes en racha', '4 semanas seguidas cumpliendo'],
+    ['Constancia', 'streak', 12, '☄️', 'Trimestre imparable', '12 semanas seguidas'],
+    ['Constancia', 'streak', 26, '🌋', 'Medio año', '26 semanas seguidas'],
+    ['Constancia', 'streak', 52, '🏔️', 'Un año entero', '52 semanas seguidas'],
+    ['Constancia', 'perfect', 1, '📅', 'Mes perfecto', 'Todas las semanas de un mes cumplidas, sin comodines'],
+    ['Constancia', 'perfect', 6, '🗓️', 'Seis meses perfectos', '6 meses perfectos'],
+    ['Fuerza', 'prs', 1, '🏆', 'Primer récord', 'Supera tu mejor marca en un ejercicio'],
+    ['Fuerza', 'prs', 10, '🥉', 'Bronce', '10 récords'],
+    ['Fuerza', 'prs', 25, '🥈', 'Plata', '25 récords'],
+    ['Fuerza', 'prs', 50, '🥇', 'Oro', '50 récords'],
+    ['Fuerza', 'prs', 100, '💎', 'Diamante', '100 récords'],
+    ['Fuerza', 'prDay', 3, '⚡', 'Día de gloria', '3 récords en un mismo entreno'],
+    ['Kilos', 'dayKg', 1000, '🏋️', 'Primera tonelada', '1.000 kg en un entreno'],
+    ['Kilos', 'dayKg', 5000, '🐘', 'Un elefante', '5.000 kg en un entreno'],
+    ['Kilos', 'totalKg', 12000, '🚌', 'Un autobús', '12 t acumuladas'],
+    ['Kilos', 'totalKg', 150000, '🐋', 'Ballena azul', '150 t acumuladas'],
+    ['Kilos', 'totalKg', 500000, '🚀', 'Medio millón', '500 t acumuladas'],
+    ['Hábitos', 'warmup', 20, '🌡️', 'Calentamiento de manual', '20 entrenos con aproximación'],
+    ['Hábitos', 'core', 10, '🎯', 'Core de acero', '10 entrenos con core'],
+    ['Hábitos', 'rated', 10, '🧘', 'Escucha tu cuerpo', 'Valora tu energía en 10 entrenos'],
+    ['Hábitos', 'early', 1, '🌅', 'Madrugón', 'Entrena antes de las 8:00'],
+    ['Hábitos', 'late', 1, '🦉', 'Búho', 'Entrena a partir de las 21:00'],
+    ['Hábitos', 'measures', 3, '📏', 'Cinta métrica', 'Anota tus medidas 3 veces'],
+    ['Hábitos', 'waistDrop', 2, '📉', 'Menos cintura', '2 cm menos de cintura que al empezar'],
+  ].map(([group, metric, target, icon, name, desc]) => ({ id: `${metric}-${target}`, group, metric, target, icon, name, desc }));
+
+  function medals() {
+    const v = { workouts: 0, streak: 0, perfect: 0, prs: 0, prDay: 0, dayKg: 0, totalKg: 0, warmup: 0, core: 0, rated: 0, early: 0, late: 0, measures: 0, waistDrop: 0 };
+    const got = {};
+    const check = (ts) => MEDALS.forEach(m => { if (!got[m.id] && v[m.metric] >= m.target) got[m.id] = ts; });
+    const best = {};
+    S().workouts.slice().sort((a, b) => a.start - b.start).forEach(w => {
+      const kg = Nutrition.lifted(w), h = new Date(w.start).getHours();
+      let prs = 0;
+      if (!['hiit', 'descarga'].includes(w.type)) w.exercises.forEach(e => {
+        const x = Progression.bestE1rm(e.sets);
+        if (best[e.exId] && x > best[e.exId] + 1e-6) prs++;
+        best[e.exId] = Math.max(best[e.exId] || 0, x);
+      });
+      v.workouts++; v.totalKg += kg; v.dayKg = Math.max(v.dayKg, kg); v.prs += prs; v.prDay = Math.max(v.prDay, prs);
+      if (w.exercises.some(e => e.warmup?.length)) v.warmup++;
+      if (w.exercises.some(e => Store.exercise(e.exId).pattern === 'core')) v.core++;
+      if (w.energy) v.rated++;
+      if (h < 8) v.early++;
+      if (h >= 21) v.late++;
+      check(w.start);
+    });
+    // Racha y meses perfectos, semana a semana.
+    const t = streakTimeline(), byMonth = {};
+    t.weeks.forEach(x => {
+      if (x.done) { v.streak = Math.max(v.streak, x.run); check(x.at); }
+      const m = weekMonth(x.k); (byMonth[m] = byMonth[m] || []).push(x);
+    });
+    Object.entries(byMonth).sort().forEach(([m, list]) => {
+      // Perfecto: mes ya terminado, con todas sus semanas registradas y cumplidas (sin comodines).
+      if (m >= monthKey(Date.now()) || list.length < weeksInMonth(m) || list.some(x => !x.done)) return;
+      v.perfect++; check(list[list.length - 1].at);
+    });
+    measures().forEach((x, i) => { v.measures = i + 1; check(dts(x.d)); });
+    const ws = series('waist');
+    ws.forEach(p => { v.waistDrop = Math.max(v.waistDrop, ws[0].v - p.v); check(dts(p.d)); });
+    return { got, v, count: Object.keys(got).length };
+  }
+  // Medallas nuevas conseguidas justo con este entreno.
+  const medalsFrom = w => { const { got } = medals(); return MEDALS.filter(m => got[m.id] === w.start); };
+
+  function viewMedals() {
+    const s = streak(), { got, v, count } = medals();
+    let h = `<div class="card hero streak-hero"><div class="day-ic big">${s.cur ? '🔥' : '🌱'}</div><h2>${s.cur} ${s.cur === 1 ? 'semana' : 'semanas'} en racha</h2>
+      <p class="muted">Tu objetivo: ${s.goal} días por semana · récord: ${s.best}</p>
+      <div class="weeks-strip">${s.weeks.slice(-12).map(x => `<i class="${x.done ? 'on' : x.saved ? 'saved' : x.current ? 'cur' : ''}" title="${fmtDate(x.k)}">${x.saved ? '🛟' : ''}</i>`).join('')}</div>
+      <p class="small">🛟 <b>${Math.max(0, s.jokersLeft)} de ${JOKERS} comodines</b> este mes. Si una semana no llegas a ${s.goal} días, se gasta uno solo y tu racha sigue.</p></div>`;
+    h += `<div class="section-head"><h2>Medallas</h2><small>${count} de ${MEDALS.length}</small></div>`;
+    [...new Set(MEDALS.map(m => m.group))].forEach(g => {
+      h += `<h3 class="medal-group">${g}</h3><div class="medals">${MEDALS.filter(m => m.group === g).map(m => {
+        const on = got[m.id], p = Math.min(1, v[m.metric] / m.target);
+        const prog = m.metric.endsWith('Kg') ? `${fmtNum(Math.min(v[m.metric], m.target) / 1000)} / ${fmtNum(m.target / 1000)} t` : `${fmtNum(Math.min(Math.floor(v[m.metric] * 10) / 10, m.target))} / ${fmtNum(m.target)}`;
+        return `<div class="medal ${on ? 'on' : ''}"><span class="mi">${m.icon}</span><b>${m.name}</b><small>${m.desc}</small>
+          ${on ? `<small class="when">${fmtDate(on)}</small>` : m.target > 1 ? `<div class="mbar"><i style="width:${p * 100}%"></i></div><small class="when">${prog}</small>` : ''}</div>`;
+      }).join('')}</div>`;
+    });
+    return h;
+  }
+
+  // ---------- confeti ----------
+  function confetti(n = 140) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const c = document.createElement('canvas'), x = c.getContext('2d'), W = c.width = innerWidth, H = c.height = innerHeight;
+    c.className = 'confetti'; document.body.appendChild(c);
+    const cols = ['#ff6a2b', '#ff9a3d', '#34d399', '#5b8cff', '#fbbf24', '#ff6fae', '#a77bff'];
+    const ps = Array.from({ length: n }, () => ({ x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35, vx: (Math.random() - .5) * 14, vy: -Math.random() * 14 - 4,
+      r: Math.random() * Math.PI, vr: (Math.random() - .5) * .4, w: 6 + Math.random() * 6, h: 4 + Math.random() * 4, c: cols[Math.random() * cols.length | 0] }));
+    const t0 = performance.now();
+    (function frame(now) {
+      const t = (now - t0) / 1000;
+      x.clearRect(0, 0, W, H);
+      ps.forEach(p => {
+        p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.globalAlpha = Math.max(0, 1 - t / 2.8); x.fillStyle = p.c; x.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); x.restore();
+      });
+      if (t < 2.8) requestAnimationFrame(frame); else c.remove();
+    })(t0);
   }
 
   // ---------- copia de seguridad: aviso una vez al mes ----------
@@ -967,6 +1102,8 @@
       const s = streak();
       h += `<div class="week-done">🔥 <b>¡Semana cumplida!</b>${wk === weekStart(Date.now()) && s.cur > 1 ? ` Llevas <b>${s.cur} semanas seguidas</b>.` : ` ${goal} de ${goal} días.`}</div>`;
     }
+    const fresh = medalsFrom(w);
+    if (fresh.length) h += `<div class="new-medals">${fresh.map(m => `<a class="new-medal" href="#/logros"><span class="mi">${m.icon}</span><div><small>¡Medalla nueva!</small><b>${m.name}</b><small>${m.desc}</small></div></a>`).join('')}</div>`;
     h += `<div class="stats inner"><div><b>${doneSets(w)}</b><small>series</small></div><div><b>${w.exercises.length}</b><small>ejercicios</small></div><div><b>${fmtDur(w.end - w.start)}</b><small>duración</small></div></div></div>`;
 
     h += energyCard(w);
@@ -1234,6 +1371,7 @@
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
     [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
     [/^#\/medidas$/, viewMeasures, 'historial', 'Medidas'],
+    [/^#\/logros$/, viewMedals, 'home', 'Logros'],
     [/^#\/mes(?:\/(\d{4}-\d{2}))?$/, viewMonth, 'historial', 'Resumen del mes'],
   ];
   function render(keepScroll) {
@@ -1257,6 +1395,11 @@
     void $app.offsetWidth;
     $app.classList.add('enter');
     animateCounts();
+    // Al terminar un entreno: confeti si ha caído medalla o se ha cumplido la semana.
+    if (celebrate && hash === '#/resumen/' + celebrate) {
+      if ($app.querySelector('.new-medal, .week-done')) setTimeout(() => confetti(), 700);
+      celebrate = null;
+    }
   }
   function animateCounts() {
     $app.querySelectorAll('[data-count]').forEach(el => {
@@ -1360,6 +1503,18 @@
     s.done = true;
     justDone = `${ei}-${si}`;
     navigator.vibrate && navigator.vibrate(30);
+    // ¿Récord? 1RM estimado de esta serie por encima de todo tu historial (y de lo que ya llevas hoy).
+    const w = S().activeWorkout;
+    if (!['goma', 'tiempo'].includes(mode) && !['descarga', 'hiit'].includes(w.type)) {
+      const hist = Progression.historyFor(e.exId), v = Progression.e1rm(Number(s.kg) || 0, Number(s.reps) || 0, s.rir);
+      const prevBest = Math.max(e.prBest || 0, ...hist.map(x => Progression.bestE1rm(x.sets)));
+      if (hist.length && v > prevBest + 1e-6) {
+        e.prBest = v;
+        setTimeout(() => confetti(90), 150);
+        navigator.vibrate && navigator.vibrate([60, 60, 60, 60, 200]);
+        toast(`🏆 ¡Récord en ${Store.exercise(e.exId).name}!`);
+      }
+    }
     const next = e.superset && S().activeWorkout.exercises[ei + 1];
     if (S().activeWorkout.past) { /* entreno pasado: sin descansos */ }
     else if (next) { Timer.stop(); toast(`🔗 Sin descanso → ${Store.exercise(next.exId).name}`); }
@@ -1531,7 +1686,7 @@
         return;
       }
       w.exercises.forEach(e => {
-        e.sets = e.sets.filter(s => s.done); delete e.suggestion;
+        e.sets = e.sets.filter(s => s.done); delete e.suggestion; delete e.prBest;
         if (e.warmup) e.warmup = e.warmup.filter(s => s.done);
         if (!e.warmup?.length) delete e.warmup;
         if (!e.pain?.length) delete e.pain;
@@ -1542,6 +1697,7 @@
       delete w.past;
       S().workouts.push(w); S().activeWorkout = null;
       Object.assign(Hiit, { idx: -1, running: false }); clearInterval(Hiit.int);
+      celebrate = w.id;
       save(); Timer.stop(); go('#/resumen/' + w.id);
     },
     discard: () => {
@@ -1587,12 +1743,17 @@
       if (!d || d > ymd(Date.now())) return toast('Elige una fecha que no sea futura.');
       Object.keys(METRICS).forEach(k => { const v = document.getElementById('m-' + k).value; if (v !== '' && Number(v) > 0) entry[k] = Number(v); });
       if (!Object.keys(entry).length) return toast('Rellena al menos una medida.');
+      const before = medals().got;
       const list = S().measures = S().measures || [], same = list.find(m => m.d === d);
       if (same) Object.assign(same, entry); else list.push(Object.assign({ d }, entry));
       // El peso más reciente alimenta el cálculo de calorías y proteína.
       const lw = series('weight').pop();
       if (lw) S().settings.bodyweight = lw.v;
-      save(); toast('📏 Medidas guardadas'); render(true);
+      save();
+      const fresh = MEDALS.filter(m => medals().got[m.id] && !before[m.id]);
+      toast(fresh.length ? `🏅 ¡Medalla nueva: ${fresh.map(m => m.name).join(', ')}!` : '📏 Medidas guardadas');
+      if (fresh.length) confetti();
+      render(true);
     },
     'del-measure': el => {
       if (!confirm(`¿Borrar las medidas del ${Cycle.fmt(el.dataset.d)}?`)) return;

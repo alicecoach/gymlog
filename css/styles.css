@@ -431,7 +431,7 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .vol.minor span, .vol.minor b { color: var(--muted); font-weight: 500; }
 
 /* ---------- racha, copia, medidas, resumen del mes ---------- */
-.streak { display: flex; align-items: center; gap: 12px; }
+.streak { display: flex; align-items: center; gap: 12px; color: inherit; }
 .streak .flame { font-size: 1.9rem; line-height: 1; }
 .streak.lit .flame { animation: flicker 2.6s ease-in-out infinite; transform-origin: 50% 90%; }
 .streak.lit { border-color: rgba(255, 106, 43, .4); background: linear-gradient(135deg, rgba(255, 106, 43, .14), transparent 70%), var(--card); }
@@ -496,3 +496,31 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .memo-line { display: block; font-size: .8rem; color: var(--warn); margin: 6px 0 0; }
 .memo-last { font-size: .78rem; color: var(--muted); margin: 4px 0; }
 .card.warn-soft { border-color: rgba(251, 191, 36, .35); font-size: .88rem; }
+
+/* ---------- comodines, medallas y confeti ---------- */
+.streak .streak-meta { display: block; margin-top: 2px; }
+.jokers s { text-decoration: none; filter: grayscale(1); opacity: .35; }
+.weeks-strip { display: flex; gap: 5px; justify-content: center; margin: 12px 0 8px; }
+.weeks-strip i { width: 20px; height: 20px; border-radius: 6px; background: var(--card2); font-style: normal; font-size: .7rem; display: flex; align-items: center; justify-content: center; }
+.weeks-strip i.on { background: var(--g-push); }
+.weeks-strip i.saved { background: rgba(91, 140, 255, .25); }
+.weeks-strip i.cur { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.medal-group { margin: 16px 0 8px; color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; }
+.medals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.medal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 6px 10px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.medal .mi { font-size: 2rem; line-height: 1.1; filter: grayscale(1); opacity: .3; }
+.medal b { font-size: .76rem; line-height: 1.2; }
+.medal small { font-size: .66rem; color: var(--muted); line-height: 1.25; }
+.medal .when { margin-top: 3px; font-weight: 700; }
+.medal.on { border-color: rgba(246, 211, 101, .45); background: radial-gradient(circle at 50% 20%, rgba(246, 211, 101, .16), transparent 70%), var(--card); }
+.medal.on .mi { filter: none; opacity: 1; animation: pop .4s var(--ease) both; }
+.medal.on .when { color: #f6d365; }
+.mbar { width: 80%; height: 4px; border-radius: 2px; background: var(--card2); margin-top: 5px; overflow: hidden; }
+.mbar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.new-medals { display: grid; gap: 8px; margin-top: 12px; }
+.new-medal { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 12px; border-radius: 14px; background: linear-gradient(135deg, rgba(246, 211, 101, .2), rgba(201, 154, 30, .08)); border: 1px solid rgba(246, 211, 101, .45); animation: pop .5s var(--ease) 1s both; }
+.new-medal .mi { font-size: 2.2rem; }
+.new-medal b, .new-medal small { display: block; }
+.new-medal small { font-size: .74rem; color: var(--muted); }
+.new-medal small:first-child { color: #f6d365; font-weight: 800; }
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 99; }
