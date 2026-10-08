@@ -19,7 +19,7 @@ const Progression = (() => {
         const e = w.exercises.find(x => x.exId === exId);
         if (!e) return null;
         const sets = e.sets.filter(s => s.done && (num(s.reps) > 0 || num(s.secs) > 0));
-        return sets.length ? { date: w.start, workoutId: w.id, sets, target: e.target } : null;
+        return sets.length ? { date: w.start, workoutId: w.id, sets, target: e.target, pain: e.pain || [], memo: e.memo || '' } : null;
       })
       .filter(Boolean);
   }

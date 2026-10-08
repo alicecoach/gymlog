@@ -8,7 +8,8 @@ const Nutrition = (() => {
     return w.exercises.reduce((a, e) => {
       const ex = Store.exercise(e.exId), st = Store.exSettings(e.exId);
       const f = st.mode === 'lado' ? 2 : st.mode === 'mancuerna' && !ex.unilateral ? 2 : 1;
-      return a + e.sets.reduce((b, s) => b + (Number(s.kg) || 0) * (Number(s.reps) || 0) * f, 0);
+      const warm = (e.warmup || []).filter(s => s.done);
+      return a + e.sets.concat(warm).reduce((b, s) => b + (Number(s.kg) || 0) * (Number(s.reps) || 0) * f, 0);
     }, 0);
   }
 

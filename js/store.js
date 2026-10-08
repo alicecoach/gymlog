@@ -6,7 +6,7 @@ const Store = (() => {
   const dataKey = id => `gymlog.u.${id}`;
   const defaults = () => ({
     version: 1,
-    settings: { restDefault: 120, bodyweight: '', sex: '', age: '', height: '' },
+    settings: { restDefault: 120, bodyweight: '', sex: '', age: '', height: '', keepAwake: true, lastBackup: 0, backupNag: 0 },
     profile: null,            // { goal, days, level, brands, excluded }
     routines: [],             // { id, name, goal, notes, days:[{ name, icon, exercises:[{ exId, sets, repMin, repMax, rir, rest, kg, note, superset }] }] }
     activeRoutineId: null,
@@ -17,6 +17,7 @@ const Store = (() => {
     photos: {},               // { [exId]: dataURL }
     presetsLoaded: [],        // claves de PRESETS ya cargadas
     cycle: { enabled: false, starts: [], hormonal: false, irregular: false, share: false }, // seguimiento opcional del ciclo
+    measures: [],             // { d: 'AAAA-MM-DD', waist, weight, hip, thigh } (cm / kg; lo que se rellene)
   });
   let users = null;           // { current, list: [{ id, name, avatar }] }
   let state = null;
@@ -105,8 +106,11 @@ const Store = (() => {
       default: return { mode: 'total', increment: 2.5 };
     }
   }
+  const WARMUP_MODES = ['total', 'lado', 'mancuerna'];
   function exSettings(id) {
     const s = Object.assign(defaultLoad(exercise(id)), get().exerciseSettings[id] || {});
+    // Series de aproximación: por defecto en los básicos con peso; se puede cambiar en la ficha del ejercicio.
+    if (s.warmup === undefined) s.warmup = !!exercise(id).compound && WARMUP_MODES.includes(s.mode);
     s.label = MODES[s.mode] || 'kg';
     return s;
   }
@@ -188,6 +192,6 @@ const Store = (() => {
     save();
   }
 
-  return { get, save, uid, allExercises, exercise, exSettings, setExSettings, toggleExcluded, MODES, exportJSON, importJSON, reset,
+  return { get, save, uid, allExercises, exercise, exSettings, WARMUP_MODES, setExSettings, toggleExcluded, MODES, exportJSON, importJSON, reset,
     addPreset, updatePreset, outdatedPreset, importRoutinePack, exportRoutinePack, migrate, getUsers, currentUser, addUser, switchUser, updateUser, deleteUser };
 })();

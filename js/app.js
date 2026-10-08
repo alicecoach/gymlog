@@ -12,6 +12,7 @@
   let justDone = null; // serie recién marcada, para animarla
   let swapOpen = null; // ejercicio del entreno con el panel de alternativas abierto
   let holdOn = null;   // serie por tiempo con la cuenta atrás en marcha ("ei-si")
+  let memoOpen = null; // ejercicio del entreno con el panel de molestias/anotación abierto
 
   const TIPS = [
     'Proteína: apunta a 1,6–2,2 g por kg de peso corporal al día.',
@@ -94,11 +95,23 @@
       sug.kg = Number(ref.kg);
       sug.msg = `Referencia: ${fmtNum(sug.kg)} ${label}. Ajústalo si hoy no encaja con ${target.repMin}–${target.repMax} reps a RIR ${target.rir}.`;
     }
-    return {
+    const ex = {
       exId, target, suggestion: sug, note: ref.note || '', superset: !!ref.superset,
       sets: Array.from({ length: Number(target.sets) || 3 }, () => ({ kg: sug.kg ?? '', reps: '', rir: '', done: false })),
     };
+    if (Store.exSettings(exId).warmup) ex.warmup = WARMUP.map(x => ({ pct: x.pct, reps: x.reps, kg: '', done: false }));
+    return ex;
   }
+  // Series de aproximación: no cuentan como volumen ni para la progresión, pero sí en los kilos totales.
+  const WARMUP = [{ pct: 50, reps: 8 }, { pct: 75, reps: 4 }];
+  // Peso de una serie de aproximación: % del peso de trabajo de hoy, redondeado al salto de la máquina.
+  function warmupKg(e, s) {
+    if (s.done) return Number(s.kg) || 0;
+    const work = Number(e.sets[0]?.kg) || Number(e.suggestion?.kg) || 0, inc = Number(Store.exSettings(e.exId).increment) || 2.5;
+    return work ? Math.max(0, Math.round(work * s.pct / 100 / inc) * inc) : 0;
+  }
+  const PAIN = { codo: 'Codo', hombro: 'Hombro', cervical: 'Cervical', lumbar: 'Lumbar', rodilla: 'Rodilla', muneca: 'Muñeca' };
+  const painTxt = keys => keys.map(k => PAIN[k] || k).join(', ').toLowerCase();
   function confirmReplace() {
     return !S().activeWorkout || confirm('Ya tienes un entreno en curso. ¿Descartarlo y empezar otro?');
   }
@@ -148,7 +161,18 @@
   // ---------- vistas ----------
   function viewHome() {
     const s = S(), r = activeRoutine(), u = Store.currentUser();
-    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>` + cycleChip();
+    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>` + cycleChip() + streakCard();
+    if (backupDue()) {
+      h += `<div class="card backup"><b>💾 Toca la copia de seguridad del mes</b>
+        <small>Tu historial solo vive en este móvil. Guárdala en Drive o envíatela: con una vez al mes basta.</small>
+        <div class="row gap"><button class="btn small primary" data-act="export">Guardar copia</button><button class="btn small ghost" data-act="backup-later">Este mes no</button></div></div>`;
+    }
+    // Los primeros días de cada mes, el resumen del mes anterior.
+    const lastM = shiftMonth(monthKey(Date.now()), -1);
+    if (new Date().getDate() <= 7 && monthStats(lastM).ws.length) {
+      h += `<a class="card row between nudge month-nudge" href="#/mes/${lastM}"><div class="grow"><b>📅 Tu resumen de ${monthName(lastM)} está listo</b>
+        <small>Kilos, récords y tus días entrenados</small></div><span class="chev">›</span></a>`;
+    }
     if (s.activeWorkout) {
       h += `<a class="card live" href="#/entreno"><span class="pulse"></span><div class="grow"><b>Entreno en curso</b>
         <small>${esc(s.activeWorkout.dayName)} · ${s.activeWorkout.past ? `📅 del ${fmtDate(s.activeWorkout.start)}` : `hace ${fmtDur(Date.now() - s.activeWorkout.start)}`}</small></div><span class="chev">›</span></a>`;
@@ -196,6 +220,160 @@
       }
     }
     return h + `<div class="card tip">💡 ${TIPS[Math.floor(Date.now() / 864e5) % TIPS.length]}</div>`;
+  }
+
+  // ---------- constancia: racha semanal ----------
+  // Semana de lunes a domingo. Cuenta días distintos con entreno; se cumple al llegar a tus días por semana.
+  const weekStart = ts => { const d = new Date(startOfDay(ts)); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); };
+  const addWeeks = (ts, n) => { const d = new Date(ts); d.setDate(d.getDate() + 7 * n); return d.getTime(); };
+  const weekGoal = () => Number(S().profile?.days) || activeRoutine()?.days.length || 3;
+  function weekDays(until = Infinity) {
+    const by = {};
+    S().workouts.filter(w => w.start <= until).forEach(w => { const k = weekStart(w.start); (by[k] = by[k] || new Set()).add(startOfDay(w.start)); });
+    return k => by[k]?.size || 0;
+  }
+  // La semana en curso no rompe la racha: suma cuando la cumples.
+  function streak() {
+    const goal = weekGoal(), cnt = weekDays(), now = weekStart(Date.now());
+    let cur = 0, k = addWeeks(now, -1);
+    while (cnt(k) >= goal) { cur++; k = addWeeks(k, -1); }
+    if (cnt(now) >= goal) cur++;
+    let best = 0, run = 0;
+    const first = S().workouts.reduce((a, w) => Math.min(a, w.start), Infinity);
+    if (first < Infinity) for (let w = weekStart(first); w <= now; w = addWeeks(w, 1)) {
+      run = cnt(w) >= goal ? run + 1 : 0; best = Math.max(best, run);
+    }
+    return { cur, best: Math.max(best, cur), goal, week: cnt(now) };
+  }
+  function streakCard() {
+    if (!S().workouts.length) return '';
+    const s = streak(), done = s.week >= s.goal;
+    const dots = Array.from({ length: Math.max(s.goal, s.week) }, (_, i) => `<i class="${i < s.week ? 'on' : ''}"></i>`).join('');
+    const title = s.cur ? `${s.cur} ${s.cur === 1 ? 'semana' : 'semanas'} seguidas` : 'Empieza tu racha';
+    const sub = done ? '✅ Semana cumplida' : `${s.week} de ${s.goal} esta semana`;
+    return `<div class="card streak ${s.cur ? 'lit' : ''}"><div class="flame">${s.cur ? '🔥' : '🌱'}</div><div class="grow"><b>${title}</b>
+      <small>${sub}${s.best > s.cur ? ` · récord: ${s.best}` : s.cur >= 2 ? ' · ¡tu mejor racha!' : ''}</small></div><div class="wdots">${dots}</div></div>`;
+  }
+
+  // ---------- copia de seguridad: aviso una vez al mes ----------
+  const MONTH = 30 * 864e5;
+  function backupDue() {
+    const s = S(); if (!s.workouts.length) return false;
+    const since = Math.max(s.settings.lastBackup || 0, s.settings.backupNag || 0, Math.min(...s.workouts.map(w => w.start)));
+    return Date.now() - since > MONTH;
+  }
+  function exportBackup() {
+    S().settings.lastBackup = Date.now(); save();
+    const name = `gymlog-${Store.currentUser().name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '')}-${ymd(Date.now())}.json`;
+    const file = new File([Store.exportJSON()], name, { type: 'application/json' });
+    // En el móvil, compartir permite guardarla directamente en Drive o enviártela.
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Copia de GymLog' }).then(() => toast('💾 Copia guardada'), () => {});
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
+      toast('💾 Copia descargada');
+    }
+  }
+
+  // ---------- medidas corporales ----------
+  const METRICS = { waist: { label: 'Cintura', unit: 'cm', icon: '📏' }, weight: { label: 'Peso', unit: 'kg', icon: '⚖️' },
+    hip: { label: 'Cadera', unit: 'cm', icon: '📐' }, thigh: { label: 'Muslo', unit: 'cm', icon: '🦵' } };
+  const measures = () => (S().measures || []).slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  const series = k => measures().filter(m => m[k] !== '' && m[k] != null).map(m => ({ d: m.d, v: Number(m[k]) }));
+  const dts = d => new Date(d + 'T12:00').getTime();
+  // Valor de una medida en una fecha (la última anotada hasta entonces).
+  const valueAt = (k, ts) => series(k).filter(p => dts(p.d) <= ts).pop();
+
+  function viewMeasures() {
+    const today = ymd(Date.now()), used = Object.keys(METRICS).filter(k => series(k).length);
+    const extra = ['hip', 'thigh'], openExtra = extra.some(k => used.includes(k));
+    const field = k => `<label>${METRICS[k].label} (${METRICS[k].unit})<input type="number" inputmode="decimal" step="0.1" id="m-${k}" data-ms placeholder="${METRICS[k].unit}"></label>`;
+    let h = `<div class="card"><h2>📏 Medidas</h2><p class="muted small">Rellena solo lo que quieras: la app usa lo que tengas.
+      Mídete la cintura a la altura del ombligo, por la mañana y siempre igual, cada 2–4 semanas.</p>
+      <div class="rx-fields two"><label>Fecha<input type="date" id="m-date" max="${today}" value="${today}"></label>${field('waist')}${field('weight')}</div>
+      <details ${openExtra ? 'open' : ''}><summary class="muted small">Más medidas (cadera, muslo)</summary><div class="rx-fields two">${extra.map(field).join('')}</div></details>
+      <button class="btn primary block" data-act="save-measure">Guardar</button></div>`;
+    used.forEach(k => {
+      const s = series(k), M = METRICS[k], last = s[s.length - 1], first = s[0];
+      const month = valueAt(k, Date.now() - MONTH);
+      const diff = (a, b) => { const v = Math.round((a - b) * 10) / 10; return v ? `${v > 0 ? '▲' : '▼'} ${fmtNum(Math.abs(v))} ${M.unit}` : '= sin cambios'; };
+      h += `<div class="card"><div class="row between"><h3>${M.icon} ${M.label}</h3><b class="m-big">${fmtNum(last.v)} <small>${M.unit}</small></b></div>
+        ${s.length > 1 ? `<p class="small">Desde el inicio (${Cycle.fmt(first.d)}): <b>${diff(last.v, first.v)}</b>${month && month.d !== last.d && month.d !== first.d ? ` · último mes: <b>${diff(last.v, month.v)}</b>` : ''}</p>
+          ${lineChart(s.map(p => ({ x: dts(p.d), y: p.v, tip: `${Cycle.fmt(p.d)} · ${fmtNum(p.v)} ${M.unit}` })), v => fmtNum(v))}`
+          : '<p class="muted small">Con una segunda medida verás cómo evoluciona.</p>'}</div>`;
+    });
+    if (used.includes('waist') && series('waist').length > 1) {
+      h += `<p class="muted small">💡 En recomposición, cintura que baja con cargas que suben = vas bien, aunque la báscula no se mueva.</p>`;
+    }
+    const list = measures().reverse();
+    if (list.length) h += `<div class="card"><h3>Anotadas</h3>${list.slice(0, 12).map(m => `<div class="hist-row"><span>${Cycle.fmt(m.d)}</span>
+      <span class="grow">${Object.keys(METRICS).filter(k => m[k] !== '' && m[k] != null).map(k => `${METRICS[k].label} ${fmtNum(m[k])}`).join(' · ')}</span>
+      <button class="icon" data-act="del-measure" data-d="${m.d}" title="Borrar">✕</button></div>`).join('')}</div>`;
+    return h;
+  }
+
+  // ---------- resumen mensual ----------
+  const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const monthKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const monthRange = key => { const [y, m] = key.split('-').map(Number); return [new Date(y, m - 1, 1).getTime(), new Date(y, m, 1).getTime()]; };
+  const monthName = key => MONTHS[Number(key.slice(5)) - 1];
+  const shiftMonth = (key, n) => { const [y, m] = key.split('-').map(Number); return monthKey(new Date(y, m - 1 + n, 1)); };
+  // Récords: cada vez que el 1RM estimado de un ejercicio supera todo lo anterior.
+  function prEvents() {
+    const best = {}, ev = [];
+    S().workouts.filter(w => !['hiit', 'descarga'].includes(w.type)).sort((a, b) => a.start - b.start).forEach(w => w.exercises.forEach(e => {
+      const v = Progression.bestE1rm(e.sets);
+      if (best[e.exId] && v > best[e.exId] + 1e-6) ev.push({ w, e, v, prev: best[e.exId] });
+      best[e.exId] = Math.max(best[e.exId] || 0, v);
+    }));
+    return ev;
+  }
+  function monthStats(key) {
+    const [a, b] = monthRange(key), ws = S().workouts.filter(w => w.start >= a && w.start < b);
+    const rated = ws.filter(w => w.energy);
+    return { ws, kg: ws.reduce((s, w) => s + Nutrition.lifted(w), 0), sets: ws.reduce((s, w) => s + doneSets(w), 0),
+      ms: ws.reduce((s, w) => s + (w.end - w.start), 0), energy: rated.length ? rated.reduce((s, w) => s + w.energy, 0) / rated.length : 0,
+      days: new Set(ws.map(w => startOfDay(w.start))) };
+  }
+  function viewMonth(key) {
+    key = key || monthKey(Date.now());
+    const [a, b] = monthRange(key), st = monthStats(key), prev = monthStats(shiftMonth(key, -1)), cur = monthKey(Date.now());
+    const nav = `<div class="month-nav"><a class="icon" href="#/mes/${shiftMonth(key, -1)}" aria-label="Mes anterior">‹</a>
+      <h2>${monthName(key)[0].toUpperCase() + monthName(key).slice(1)} ${key.slice(0, 4)}</h2>
+      ${key < cur ? `<a class="icon" href="#/mes/${shiftMonth(key, 1)}" aria-label="Mes siguiente">›</a>` : '<span class="icon"></span>'}</div>`;
+    if (!st.ws.length) return nav + `<div class="card hero"><div class="day-ic big">📅</div><p class="muted">Sin entrenos este mes${key === cur ? ' todavía. ¡El primero cuenta doble!' : '.'}</p></div>`;
+    // Comparar con un mes casi vacío daría porcentajes absurdos: solo si el anterior tuvo 4+ entrenos.
+    const pct = (x, y) => y && prev.ws.length >= 4 ? Math.round((x / y - 1) * 100) : null;
+    const delta = (x, y) => { const p = pct(x, y); return p ? `<small class="delta ${p > 0 ? 'pos' : 'neg'}">${p > 0 ? '▲' : '▼'} ${Math.abs(p)} %</small>` : ''; };
+    const c = Nutrition.compare(st.kg);
+    let h = nav + `<div class="card hero sum month-hero"><p class="lift-label">${key === cur ? 'Este mes llevas' : 'Este mes levantaste'}</p>
+      <div class="lift"><b data-count="${Math.round(st.kg)}">0</b> kg</div>
+      <p class="lift-cmp">¡${fmtNum(c.count)} ${c.name} ${c.emoji}!</p>${prev.kg && prev.ws.length >= 4 ? `<p class="muted small">vs. ${monthName(shiftMonth(key, -1))}: ${delta(st.kg, prev.kg) || 'igual'}</p>` : ''}
+      <div class="stats inner"><div><b>${st.ws.length}</b><small>entrenos</small>${delta(st.ws.length, prev.ws.length)}</div>
+      <div><b>${st.sets}</b><small>series</small></div><div><b>${fmtDur(st.ms)}</b><small>entrenando</small></div></div></div>`;
+    // Calendario del mes: un cuadrito por día, encendido si entrenaste.
+    const first = new Date(a), offset = (first.getDay() + 6) % 7, n = Math.round((b - a) / 864e5);
+    const today = startOfDay(Date.now());
+    h += `<div class="card"><h3>🗓️ Tus días</h3><div class="cal">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-h">${d}</span>`).join('')}
+      ${'<span></span>'.repeat(offset)}${Array.from({ length: n }, (_, i) => { const t = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
+        return `<span class="cal-d ${st.days.has(t) ? 'on' : ''} ${t === today ? 'today' : ''} ${t > today ? 'future' : ''}">${i + 1}</span>`; }).join('')}</div>
+      <p class="muted small">${st.days.size} ${st.days.size === 1 ? 'día entrenado' : 'días entrenados'}.</p></div>`;
+    const prs = prEvents().filter(x => x.w.start >= a && x.w.start < b), byEx = {};
+    prs.forEach(x => { if (!byEx[x.e.exId] || x.v > byEx[x.e.exId].v) byEx[x.e.exId] = Object.assign({}, x, { first: byEx[x.e.exId]?.first ?? x.prev }); });
+    const top = Object.values(byEx).sort((x, y) => (y.v / y.first) - (x.v / x.first));
+    h += `<div class="card"><h3>🏆 Récords del mes${top.length ? ` · ${top.length}` : ''}</h3>${top.length ? top.map(x => `<div class="hist-row"><span class="grow">${esc(Store.exercise(x.e.exId).name)}</span>
+      <span><b>${fmtNum(x.v)}</b> <small class="muted">▲ ${Math.max(1, Math.round((x.v / x.first - 1) * 100))} %</small></span></div>`).join('')
+      : '<p class="muted small">Ninguno este mes. Los meses de consolidar también cuentan.</p>'}<p class="muted small">1RM estimado.</p></div>`;
+    const strong = st.ws.slice().sort((x, y) => Nutrition.lifted(y) - Nutrition.lifted(x))[0];
+    if (Nutrition.lifted(strong) > 0) h += `<a class="card row between" href="#/resumen/${strong.id}"><div class="day-ic">${workoutIcon(strong)}</div><div class="grow" style="margin-left:12px">
+      <small>💥 Tu sesión más fuerte</small><b>${esc(strong.dayName)}</b><small>${fmtDate(strong.start)} · ${fmtNum(Math.round(Nutrition.lifted(strong)))} kg</small></div><span class="chev">›</span></a>`;
+    if (st.energy) h += `<div class="card row between"><div class="grow"><small>Energía media al terminar</small><b>${Cycle.ENERGY[Math.round(st.energy)].icon} ${fmtNum(st.energy)}/4</b></div></div>`;
+    const w0 = valueAt('waist', a - 1) || series('waist').find(p => dts(p.d) >= a), w1 = valueAt('waist', b - 1);
+    if (w0 && w1 && w1.d !== w0.d && dts(w1.d) >= a) {
+      const d = Math.round((w1.v - w0.v) * 10) / 10;
+      h += `<a class="card row between" href="#/medidas"><div class="grow"><small>📏 Cintura</small><b>${fmtNum(w1.v)} cm ${d ? `<small class="delta ${d < 0 ? 'pos' : 'neg'}">${d < 0 ? '▼' : '▲'} ${fmtNum(Math.abs(d))} cm</small>` : ''}</b></div><span class="chev">›</span></a>`;
+    }
+    return h;
   }
 
   // ---------- ciclo ----------
@@ -484,15 +662,77 @@
         ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}</div>
         <p class="muted small">${st.mode === 'goma' ? `Anotas el color de la goma. Orden de suave a dura: ${Object.values(BANDS).map(b => b.dot + ' ' + b.label.toLowerCase()).join(' → ')} (puede variar según la marca).`
           : st.mode === 'tiempo' ? 'Eliges los segundos de cada serie y la app hace la cuenta atrás.'
-          : 'Ajusta la subida al salto real de la máquina (p. ej. 1,25 si tienes discos pequeños, o el salto entre placas).'}</p></div>
+          : 'Ajusta la subida al salto real de la máquina (p. ej. 1,25 si tienes discos pequeños, o el salto entre placas).'}</p>
+        ${Store.WARMUP_MODES.includes(st.mode) ? `<label class="check-row"><input type="checkbox" data-exs-wu data-id="${id}" ${st.warmup ? 'checked' : ''}> 🔥 Series de aproximación (50 % × 8 y 75 % × 4)</label>` : ''}</div>
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>`;
     const alts = Generator.alternatives(id);
     if (alts.length) h += `<div class="card"><h3>Alternativas</h3><p class="muted small">Trabajan lo mismo, por si la máquina está ocupada.</p>
       ${alts.map(e => `<a class="list-item" href="#/ejercicio/${e.id}">${thumb(e.id, 'sm')}<div class="grow"><b>${esc(e.name)}</b>
         <small>${esc(e.brand)}${e.line ? ' · ' + esc(e.line) : ''} · ${esc(e.primary.join(', '))}</small></div></a>`).join('')}</div>`;
+    h += progressCard(id, hist, st);
+    const recent = hist.slice(0, 10), sore = recent.filter(x => x.pain.length);
+    if (sore.length) {
+      const areas = [...new Set(sore.flatMap(x => x.pain))];
+      h += `<div class="card warn-soft">⚠️ Molestias en <b>${sore.length} de tus últimas ${recent.length} sesiones</b> (${esc(painTxt(areas))}).
+        ${sore.length >= 2 ? 'Si se repite, prueba una alternativa o baja la carga.' : ''}</div>`;
+    }
     h += `<div class="card"><h3>Historial</h3>${best ? `<p>Mejor 1RM estimado: <b>${best.toFixed(1)} ${st.label}</b></p>` : ''}
-      ${hist.length ? hist.map(x => `<div class="hist-row"><span>${fmtDate(x.date)}</span><span>${x.sets.map(s => esc(Progression.fmtSet(id, s))).join(' · ')}</span></div>`).join('') : '<p class="muted">Sin registros todavía.</p>'}</div>`;
+      ${hist.length ? hist.map(x => `<div class="hist-row"><span>${fmtDate(x.date)}</span><span>${x.sets.map(s => esc(Progression.fmtSet(id, s))).join(' · ')}${
+        x.pain.length || x.memo ? `<small class="memo-line">${x.pain.length ? `⚠️ ${esc(painTxt(x.pain))}` : '📝'}${x.memo ? ' · ' + esc(x.memo) : ''}</small>` : ''}</span></div>`).join('') : '<p class="muted">Sin registros todavía.</p>'}</div>`;
     return h;
+  }
+
+  // Progreso de un ejercicio: 1RM estimado (con peso) o segundos (por tiempo). Con goma no hay número que dibujar.
+  function progressCard(id, hist, st) {
+    if (st.mode === 'goma' || hist.length < 2) return '';
+    const timed = st.mode === 'tiempo';
+    const pts = hist.slice(0, 30).reverse().map(x => {
+      const y = timed ? Math.max(...x.sets.map(s => Number(s.secs) || 0)) : Progression.bestE1rm(x.sets);
+      return { x: x.date, y, tip: `${fmtDate(x.date)} · ${timed ? `${y} s` : `${fmtNum(y)} ${st.label}`}`, sub: x.sets.map(s => Progression.fmtSet(id, s)).join(' · ') };
+    }).filter(p => p.y > 0);
+    if (pts.length < 2) return '';
+    const first = pts[0].y, last = pts[pts.length - 1].y, pct = Math.round((last / first - 1) * 100);
+    return `<div class="card"><div class="row between"><h3>📈 Progreso</h3>${pct ? `<span class="delta-chip ${pct > 0 ? 'pos' : 'neg'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)} %</span>` : ''}</div>
+      <p class="muted small">${timed ? 'Mejor tiempo de cada sesión' : `1RM estimado de cada sesión (${st.label}): sube aunque cambies de reps o de peso`}. Toca la gráfica para ver cada día.</p>
+      ${lineChart(pts, v => timed ? `${Math.round(v)} s` : fmtNum(v))}</div>`;
+  }
+
+  // Gráfica de línea de una serie: línea de 2 px, puntos con anillo, rejilla tenue y valor solo en el último punto.
+  // Al tocarla muestra el punto más cercano (ver el listener de pointerdown).
+  function lineChart(pts, fmt) {
+    const W = 320, H = 150, L = 38, R = 14, T = 14, B = 24;
+    let lo = Math.min(...pts.map(p => p.y)), hi = Math.max(...pts.map(p => p.y));
+    const pad = (hi - lo) * 0.15 || Math.max(1, hi * 0.05);
+    lo = Math.max(0, lo - pad); hi += pad;
+    const step = niceStep((hi - lo) / 3), y0 = Math.floor(lo / step) * step, y1 = Math.ceil(hi / step) * step;
+    const x0 = pts[0].x, x1 = pts[pts.length - 1].x;
+    const X = x => L + (x1 === x0 ? (W - L - R) / 2 : (x - x0) / (x1 - x0) * (W - L - R)), Y = y => T + (1 - (y - y0) / (y1 - y0)) * (H - T - B);
+    const ticks = []; for (let v = y0; v <= y1 + step / 2; v += step) ticks.push(v);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join('');
+    const area = `${line}L${X(x1).toFixed(1)},${Y(y0).toFixed(1)}L${X(x0).toFixed(1)},${Y(y0).toFixed(1)}Z`;
+    const short = ts => new Date(ts).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    const lp = pts[pts.length - 1];
+    const data = pts.map(p => ({ x: +(X(p.x) / W * 100).toFixed(2), y: +(Y(p.y) / H * 100).toFixed(2), t: p.tip, s: p.sub || '' }));
+    return `<div class="chart" data-pts="${esc(JSON.stringify(data))}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfica de progreso">
+      ${ticks.map(v => `<line class="c-grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="c-axis" x="${L - 6}" y="${Y(v) + 3.5}" text-anchor="end">${fmtNum(v)}</text>`).join('')}
+      <text class="c-axis" x="${L}" y="${H - 6}">${short(x0)}</text><text class="c-axis" x="${W - R}" y="${H - 6}" text-anchor="end">${short(x1)}</text>
+      <path class="c-area" d="${area}"/><path class="c-line" d="${line}"/>
+      ${pts.map(p => `<circle class="c-dot" cx="${X(p.x)}" cy="${Y(p.y)}" r="4"/>`).join('')}
+      <text class="c-val" x="${Math.min(X(lp.x), W - R)}" y="${Y(lp.y) - 10}" text-anchor="end">${fmt(lp.y)}</text></svg>
+      <div class="c-hair"></div><div class="c-tip"></div></div>`;
+  }
+  const niceStep = raw => { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; };
+  function chartPoint(ev) {
+    const c = ev.target.closest('.chart');
+    document.querySelectorAll('.chart.show').forEach(x => x !== c && x.classList.remove('show'));
+    if (!c) return;
+    const pts = JSON.parse(c.dataset.pts), r = c.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * 100;
+    const p = pts.reduce((a, b) => Math.abs(b.x - px) < Math.abs(a.x - px) ? b : a);
+    const tip = c.querySelector('.c-tip'), hair = c.querySelector('.c-hair');
+    tip.innerHTML = `<b>${esc(p.t)}</b>${p.s ? `<small>${esc(p.s)}</small>` : ''}`;
+    hair.style.left = p.x + '%'; hair.style.setProperty('--y', p.y + '%');
+    tip.style.left = Math.min(Math.max(p.x, 22), 78) + '%';
+    c.classList.add('show');
   }
 
   function viewNewExercise() {
@@ -575,20 +815,36 @@
     const list = S().activeWorkout.exercises, nextEx = e.superset && list[ei + 1], prevSS = ei > 0 && list[ei - 1].superset;
     const ssBadge = nextEx ? `<div class="ss">🔗 Superserie con <b>${esc(Store.exercise(nextEx.exId).name)}</b> · sin descanso entre ambos</div>`
       : prevSS ? '<div class="ss">🔗 2ª parte de la superserie · ahora sí, descansa</div>' : '';
+    const hasMemo = (e.pain || []).length || e.memo;
+    // Lo que anotaste la última vez (molestias o notas), en una sola línea.
+    const lastMemo = prev && (prev.pain.length || prev.memo) ? `<div class="memo-last">${prev.pain.length ? `⚠️ La última vez: molestia de ${esc(painTxt(prev.pain))}` : '📝 La última vez'}${prev.memo ? ` · «${esc(prev.memo)}»` : ''}</div>` : '';
+    const warm = e.warmup?.length ? `<div class="warmup"><span>🔥 Aproximación</span>${e.warmup.map((s, wi) => { const kg = warmupKg(e, s);
+      return `<button class="wu ${s.done ? 'on' : ''}" data-act="wu" data-ei="${ei}" data-wi="${wi}">${kg ? `${fmtNum(kg)} ${st.label}` : `${s.pct} %`} × ${s.reps}</button>`; }).join('')}</div>` : '';
     return `<section class="card ex ${allDone ? 'complete' : ''} ${nextEx ? 'ss-top' : ''} ${prevSS ? 'ss-bottom' : ''}">${ssBadge}
       <div class="rx-head">${thumb(e.exId)}<div class="grow"><a href="#/ejercicio/${e.exId}"><h3>${esc(ex.name)}</h3></a><small>${esc(ex.brand)}${ex.line ? ' · ' + esc(ex.line) : ''}</small></div>
+        <button class="memo-btn ${memoOpen === ei ? 'open' : hasMemo ? 'on' : ''}" data-act="memo-open" data-ei="${ei}" title="Molestias o anotación">📝</button>
         <button class="swap-btn ${swapOpen === ei ? 'on' : ''}" data-act="swap-open" data-ei="${ei}" title="Cambiar de máquina">⇄</button>
         <button class="icon" data-act="rm-wex" data-ei="${ei}" title="Quitar">✕</button></div>
       ${swapOpen === ei ? swapPanel(e, ei) : ''}
+      ${memoOpen === ei ? memoPanel(e, ei) : hasMemo ? `<div class="memo-line">${(e.pain || []).length ? `⚠️ ${esc(painTxt(e.pain))}` : ''}${(e.pain || []).length && e.memo ? ' · ' : ''}${esc(e.memo || '')}</div>` : ''}
       ${e.swappedFrom ? `<div class="swapped">⇄ Hoy en lugar de ${esc(Store.exercise(e.swappedFrom).name)}</div>` : ''}
+      ${lastMemo}
       <div class="target">${st.mode === 'tiempo' ? `<span>${t.sets} × ${fmtRest(Number(t.secs) || 30)}</span>`
         : `<span>${t.sets} × ${t.repMin}–${t.repMax}</span><span>RIR ${t.rir}</span>`}<span>⏱ ${fmtRest(t.rest)}</span></div>
       ${e.note ? `<div class="note">📝 ${esc(e.note)}</div>` : ''}
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>
-      <div class="prev">Anterior: ${esc(prevTxt)}</div>
+      <div class="prev">Anterior: ${esc(prevTxt)}</div>${warm}
       <table class="sets ${st.mode === 'tiempo' ? 'hold' : st.mode === 'goma' ? 'band' : ''}">${setRows(e, ei, st.mode)}</table>
       <div class="row gap"><button class="btn small ghost" data-act="add-set" data-ei="${ei}">+ Serie</button>
       <button class="btn small ghost" data-act="del-set" data-ei="${ei}">− Serie</button></div></section>`;
+  }
+
+  // Panel compacto: molestias con un toque y una línea de texto libre.
+  function memoPanel(e, ei) {
+    const on = e.pain || [];
+    return `<div class="memo-panel"><div class="pain-chips">${Object.entries(PAIN).map(([k, v]) =>
+      `<button class="chip sm ${on.includes(k) ? 'on' : ''}" data-act="pain" data-ei="${ei}" data-p="${k}">${v}</button>`).join('')}</div>
+      <input data-memo="${ei}" value="${esc(e.memo || '')}" placeholder="Anotación: técnica, sensaciones, ajuste…" maxlength="140"></div>`;
   }
 
   // Filas de series: peso (kg + reps + RIR), goma (color + reps + RIR) o tiempo (segundos + cuenta atrás).
@@ -704,6 +960,13 @@
       const secs = w.exercises.reduce((a, e) => a + e.sets.filter(s => s.done).length * (w.hiit?.work || 40), 0);
       h += `<p class="lift-label">Trabajo a tope</p><div class="lift"><b data-count="${Math.round(secs / 60)}">0</b> min</div><div class="emojis"><span>🔥</span><span>🔥</span><span>🔥</span></div>`;
     }
+    // ¿Este entreno ha completado la semana? (justo el que llega al objetivo, no los siguientes)
+    const wk = weekStart(w.start), goal = weekGoal();
+    const before = weekDays(w.start - 1)(wk), after = weekDays(w.end || w.start)(wk);
+    if (before < goal && after >= goal && !S().workouts.some(x => x.id !== w.id && startOfDay(x.start) === startOfDay(w.start) && x.start < w.start)) {
+      const s = streak();
+      h += `<div class="week-done">🔥 <b>¡Semana cumplida!</b>${wk === weekStart(Date.now()) && s.cur > 1 ? ` Llevas <b>${s.cur} semanas seguidas</b>.` : ` ${goal} de ${goal} días.`}</div>`;
+    }
     h += `<div class="stats inner"><div><b>${doneSets(w)}</b><small>series</small></div><div><b>${w.exercises.length}</b><small>ejercicios</small></div><div><b>${fmtDur(w.end - w.start)}</b><small>duración</small></div></div></div>`;
 
     h += energyCard(w);
@@ -719,6 +982,7 @@
         const sg = Progression.suggest(e.exId, e.target);
         h += `<div class="card ex-sum"><div class="rx-head">${thumb(e.exId, 'sm')}<div class="grow"><b>${esc(ex.name)}</b>
           <small>${e.sets.map(s => esc(Progression.fmtSet(e.exId, s))).join(' · ')}</small></div>${pr ? '<span class="tag gold">🏆 Récord</span>' : ''}</div>
+          ${e.pain?.length || e.memo ? `<div class="memo-line">${e.pain?.length ? `⚠️ ${esc(painTxt(e.pain))}` : '📝'}${e.memo ? ' · ' + esc(e.memo) : ''}</div>` : ''}
           <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div></div>`;
       });
     }
@@ -751,10 +1015,13 @@
       if (e.superset) L.push(`   En superserie con el siguiente`);
       if (w.type === 'hiit') L.push(`   ${e.sets.filter(s => s.done).length} intervalos hechos`);
       else {
+        if (e.warmup?.length) L.push(`   Aproximación: ${e.warmup.map(s => `${fmtNum(s.kg)} ${st.label} × ${s.reps}`).join(' | ')}`);
         L.push(`   Series: ${e.sets.map(s => Progression.fmtSet(e.exId, s)).join(' | ')}`);
         if (w.type !== 'descarga' && Progression.historyFor(e.exId)[0]?.workoutId === w.id) L.push(`   Próxima vez: ${Progression.suggest(e.exId, t).msg}`);
       }
       if (e.note) L.push(`   Nota: ${e.note}`);
+      if (e.pain?.length) L.push(`   Molestia: ${painTxt(e.pain)}`);
+      if (e.memo) L.push(`   Anotación: ${e.memo}`);
     });
     L.push('', 'Leyenda: "@2" = RIR (reps que me quedaban en reserva). "kg/lado" = discos por lado.');
     return L.join('\n');
@@ -778,7 +1045,11 @@
     const c = S().cycle;
     const cyLink = c.enabled && !c.hormonal && !c.irregular ? `<a class="card row between nudge" href="#/ciclo"><div class="grow"><b>📊 Tu patrón del ciclo</b>
       <small>Tu energía y tus récords en cada fase</small></div><span class="chev">›</span></a>` : '';
-    return weekVolumeCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
+    const m = monthStats(monthKey(Date.now())), waist = series('waist').pop();
+    const links = `<div class="link-grid"><a class="card nudge" href="#/mes"><b>📅 ${monthName(monthKey(Date.now()))[0].toUpperCase() + monthName(monthKey(Date.now())).slice(1)}</b>
+        <small>${m.ws.length} ${m.ws.length === 1 ? 'entreno' : 'entrenos'} · resumen</small></a>
+      <a class="card nudge" href="#/medidas"><b>📏 Medidas</b><small>${waist ? `Cintura ${fmtNum(waist.v)} cm` : 'Anota tu cintura'}</small></a></div>`;
+    return links + weekVolumeCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
       const kg = Nutrition.lifted(w);
       return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
         <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
@@ -890,13 +1161,16 @@
       <div class="card" id="body-card"><h2>Mis datos</h2>${bodyFields(false)}<div id="energy">${energyHTML()}</div></div>
       ${cycleSettings()}
       <div class="card"><h2>Ajustes</h2>
-      <label>Descanso por defecto (s)<input type="number" id="s-rest" value="${S().settings.restDefault}"></label></div>
+      <label>Descanso por defecto (s)<input type="number" id="s-rest" value="${S().settings.restDefault}"></label>
+      <label class="check-row"><input type="checkbox" id="s-awake" ${S().settings.keepAwake !== false ? 'checked' : ''}> Mantener la pantalla encendida durante el entreno</label></div>
+      <a class="card row between" href="#/medidas"><div class="grow"><b>📏 Medidas corporales</b><small>Cintura, peso, cadera, muslo: lo que quieras</small></div><span class="chev">›</span></a>
       <div class="card"><h3>Material de mi gimnasio</h3><p class="muted small">Marcas que salen en las alternativas, el generador y los entrenos rápidos.</p>
         ${Generator.BRANDS.map(b => `<label class="check-row"><input type="checkbox" class="s-brand" value="${b}" ${(S().profile?.brands || Generator.BRANDS).includes(b) ? 'checked' : ''}> ${b === 'Genérico' ? 'Peso libre, poleas, gomas y multipower' : b}</label>`).join('')}</div>
       <div class="card"><h3>Ejercicios a evitar</h3><p class="muted small">No saldrán en rutinas generadas ni entrenos rápidos. Puedes añadir más desde la ficha de cada ejercicio.</p>
         ${excluded().length ? excluded().map(id => `<div class="hist-row"><span>${esc(Store.exercise(id).name)}</span>
           <button class="btn small ghost" data-act="toggle-excl" data-id="${id}">Permitir</button></div>`).join('') : '<p class="muted">Ninguno.</p>'}</div>
-      <div class="card"><h3>Copia de seguridad</h3><p class="muted small">Los datos de este perfil solo están en este móvil. Exporta de vez en cuando.</p>
+      <div class="card"><h3>Copia de seguridad</h3><p class="muted small">Los datos de este perfil solo están en este móvil. Te lo recuerdo una vez al mes.
+        ${S().settings.lastBackup ? `Última copia: <b>${agoTxt(S().settings.lastBackup)}</b>.` : 'Aún no has hecho ninguna.'}</p>
       <div class="row gap"><button class="btn" data-act="export">Exportar</button>
       <label class="btn file-btn">Importar<input type="file" accept="application/json,.json" id="import" hidden></label></div></div>
       <div class="card"><button class="btn ghost danger" data-act="reset">Borrar los datos de ${esc(u.name)}</button></div>
@@ -959,6 +1233,8 @@
     [/^#\/editar\/(\w+)$/, viewEditWorkout, 'historial', 'Corregir entreno'],
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
     [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
+    [/^#\/medidas$/, viewMeasures, 'historial', 'Medidas'],
+    [/^#\/mes(?:\/(\d{4}-\d{2}))?$/, viewMonth, 'historial', 'Resumen del mes'],
   ];
   function render(keepScroll) {
     // Sin ningún perfil todavía: primero la bienvenida.
@@ -973,6 +1249,7 @@
     document.getElementById('title').textContent = route[3];
     document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('on', a.dataset.tab === route[2]));
     justDone = null;
+    syncWakeLock();
     if (keepScroll) { window.scrollTo(0, y); return; }
     window.scrollTo(0, 0);
     // Animación de entrada de la vista.
@@ -992,7 +1269,25 @@
       requestAnimationFrame(step);
     });
   }
-  window.addEventListener('hashchange', () => { swapOpen = null; render(false); });
+  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; render(false); });
+
+  // Pantalla encendida mientras hay un entreno en curso (no en los de días pasados).
+  let wakeLock = null, wakeBusy = false;
+  async function syncWakeLock() {
+    if (!('wakeLock' in navigator) || wakeBusy) return;
+    const w = Store.currentUser() && S().activeWorkout;
+    const want = !!w && !w.past && S().settings.keepAwake !== false && document.visibilityState === 'visible';
+    wakeBusy = true;
+    try {
+      if (want && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } else if (!want && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { wakeLock = null; /* sin permiso o batería baja: no pasa nada */ }
+    wakeBusy = false;
+  }
+  // Al volver a la app, Android suelta el bloqueo: se pide otra vez.
+  document.addEventListener('visibilitychange', syncWakeLock);
 
   // ---------- temporizador de descanso ----------
   const Timer = (() => {
@@ -1192,7 +1487,18 @@
       sets.push(s); save(); render(true);
     },
     'del-set': el => { const sets = S().activeWorkout.exercises[el.dataset.ei].sets; if (sets.length > 1) sets.pop(); save(); render(true); },
-    'swap-open': el => { const i = Number(el.dataset.ei); swapOpen = swapOpen === i ? null : i; render(true); },
+    'swap-open': el => { const i = Number(el.dataset.ei); swapOpen = swapOpen === i ? null : i; memoOpen = null; render(true); },
+    'memo-open': el => { const i = Number(el.dataset.ei); memoOpen = memoOpen === i ? null : i; swapOpen = null; render(true); },
+    pain: el => {
+      const e = S().activeWorkout.exercises[el.dataset.ei], p = el.dataset.p, on = e.pain || [];
+      e.pain = on.includes(p) ? on.filter(x => x !== p) : on.concat(p);
+      save(); el.classList.toggle('on', e.pain.includes(p));
+    },
+    wu: el => {
+      const e = S().activeWorkout.exercises[el.dataset.ei], s = e.warmup[el.dataset.wi];
+      if (!s.done) { s.kg = warmupKg(e, s); navigator.vibrate && navigator.vibrate(30); }
+      s.done = !s.done; save(); render(true);
+    },
     'swap-to': el => { if (swapWorkoutEx(Number(el.dataset.ei), el.dataset.id)) render(true); },
     'rm-wex': el => {
       swapOpen = null;
@@ -1224,7 +1530,13 @@
         document.getElementById('msg').innerHTML = '<div class="card warn">Marca con ✓ al menos una serie antes de terminar.</div>';
         return;
       }
-      w.exercises.forEach(e => { e.sets = e.sets.filter(s => s.done); delete e.suggestion; });
+      w.exercises.forEach(e => {
+        e.sets = e.sets.filter(s => s.done); delete e.suggestion;
+        if (e.warmup) e.warmup = e.warmup.filter(s => s.done);
+        if (!e.warmup?.length) delete e.warmup;
+        if (!e.pain?.length) delete e.pain;
+        if (!e.memo) delete e.memo;
+      });
       w.exercises = w.exercises.filter(e => e.sets.length);
       w.end = w.past ? w.start + w.past * 60000 : Date.now();
       delete w.past;
@@ -1268,12 +1580,23 @@
     'share-summary': () => navigator.share({ text: document.getElementById('sum-text').value }).catch(() => {}),
     'timer-add': el => Timer.add(Number(el.dataset.s)),
     'timer-stop': () => Timer.stop(),
-    export: () => {
-      const blob = new Blob([Store.exportJSON()], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `gymlog-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
+    export: () => { exportBackup(); render(true); },
+    'backup-later': () => { S().settings.backupNag = Date.now(); save(); render(true); },
+    'save-measure': () => {
+      const d = document.getElementById('m-date').value, entry = {};
+      if (!d || d > ymd(Date.now())) return toast('Elige una fecha que no sea futura.');
+      Object.keys(METRICS).forEach(k => { const v = document.getElementById('m-' + k).value; if (v !== '' && Number(v) > 0) entry[k] = Number(v); });
+      if (!Object.keys(entry).length) return toast('Rellena al menos una medida.');
+      const list = S().measures = S().measures || [], same = list.find(m => m.d === d);
+      if (same) Object.assign(same, entry); else list.push(Object.assign({ d }, entry));
+      // El peso más reciente alimenta el cálculo de calorías y proteína.
+      const lw = series('weight').pop();
+      if (lw) S().settings.bodyweight = lw.v;
+      save(); toast('📏 Medidas guardadas'); render(true);
+    },
+    'del-measure': el => {
+      if (!confirm(`¿Borrar las medidas del ${Cycle.fmt(el.dataset.d)}?`)) return;
+      S().measures = S().measures.filter(m => m.d !== el.dataset.d); save(); render(true);
     },
     reset: () => { if (confirm('¿Seguro? Se borrarán rutinas, historial y fotos de este perfil.')) { Store.reset(); go('#/'); render(); } },
     'update-preset': el => {
@@ -1301,6 +1624,9 @@
       Store.deleteUser(u.id); render(true);
     },
   };
+
+  document.addEventListener('pointerdown', chartPoint);
+  document.addEventListener('pointermove', ev => { if (ev.target.closest('.chart.show')) chartPoint(ev); });
 
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
@@ -1339,7 +1665,18 @@
         }
       });
       save();
-    } else if ('xs' in d) { routineOf(t).days[d.di].exercises[d.xi].superset = t.checked; save(); }
+      // Los pesos de aproximación siguen al peso de trabajo.
+      const e = S().activeWorkout.exercises[d.ei], label = Store.exSettings(e.exId).label;
+      if (d.f === 'kg' && e.warmup) e.warmup.forEach((s, wi) => {
+        const b = document.querySelector(`[data-act="wu"][data-ei="${d.ei}"][data-wi="${wi}"]`), kg = warmupKg(e, s);
+        if (b) b.textContent = `${kg ? `${fmtNum(kg)} ${label}` : `${s.pct} %`} × ${s.reps}`;
+      });
+    } else if (d.memo) {
+      S().activeWorkout.exercises[d.memo].memo = t.value.trim(); save();
+    } else if ('exsWu' in d) { Store.setExSettings(d.id, { warmup: t.checked }); }
+    else if (t.id === 's-awake') { S().settings.keepAwake = t.checked; save(); syncWakeLock(); }
+    else if (d.ms) { /* campos del formulario de medidas: se guardan con el botón */ }
+    else if ('xs' in d) { routineOf(t).days[d.di].exercises[d.xi].superset = t.checked; save(); }
     else if (d.xf) { routineOf(t).days[d.di].exercises[d.xi][d.xf] = val; save(); }
     else if (d.df) { routineOf(t).days[d.di][d.df] = t.value; save(); }
     else if (d.rf) { routineOf(t)[d.rf] = t.value; save(); }
