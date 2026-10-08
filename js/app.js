@@ -306,19 +306,16 @@
     ['Hábitos', 'warmup', 20, '🌡️', 'Calentamiento de manual', '20 entrenos con aproximación'],
     ['Hábitos', 'core', 10, '🎯', 'Core de acero', '10 entrenos con core'],
     ['Hábitos', 'rated', 10, '🧘', 'Escucha tu cuerpo', 'Valora tu energía en 10 entrenos'],
-    ['Hábitos', 'early', 1, '🌅', 'Madrugón', 'Entrena antes de las 8:00'],
-    ['Hábitos', 'late', 1, '🦉', 'Búho', 'Entrena a partir de las 21:00'],
     ['Hábitos', 'measures', 3, '📏', 'Cinta métrica', 'Anota tus medidas 3 veces'],
-    ['Hábitos', 'waistDrop', 2, '📉', 'Menos cintura', '2 cm menos de cintura que al empezar'],
   ].map(([group, metric, target, icon, name, desc]) => ({ id: `${metric}-${target}`, group, metric, target, icon, name, desc }));
 
   function medals() {
-    const v = { workouts: 0, streak: 0, perfect: 0, prs: 0, prDay: 0, dayKg: 0, totalKg: 0, warmup: 0, core: 0, rated: 0, early: 0, late: 0, measures: 0, waistDrop: 0 };
+    const v = { workouts: 0, streak: 0, perfect: 0, prs: 0, prDay: 0, dayKg: 0, totalKg: 0, warmup: 0, core: 0, rated: 0, measures: 0 };
     const got = {};
     const check = (ts) => MEDALS.forEach(m => { if (!got[m.id] && v[m.metric] >= m.target) got[m.id] = ts; });
     const best = {};
     S().workouts.slice().sort((a, b) => a.start - b.start).forEach(w => {
-      const kg = Nutrition.lifted(w), h = new Date(w.start).getHours();
+      const kg = Nutrition.lifted(w);
       let prs = 0;
       if (!['hiit', 'descarga'].includes(w.type)) w.exercises.forEach(e => {
         const x = Progression.bestE1rm(e.sets);
@@ -329,8 +326,6 @@
       if (w.exercises.some(e => e.warmup?.length)) v.warmup++;
       if (w.exercises.some(e => Store.exercise(e.exId).pattern === 'core')) v.core++;
       if (w.energy) v.rated++;
-      if (h < 8) v.early++;
-      if (h >= 21) v.late++;
       check(w.start);
     });
     // Racha y meses perfectos, semana a semana.
@@ -345,8 +340,6 @@
       v.perfect++; check(list[list.length - 1].at);
     });
     measures().forEach((x, i) => { v.measures = i + 1; check(dts(x.d)); });
-    const ws = series('waist');
-    ws.forEach(p => { v.waistDrop = Math.max(v.waistDrop, ws[0].v - p.v); check(dts(p.d)); });
     return { got, v, count: Object.keys(got).length };
   }
   // Medallas nuevas conseguidas justo con este entreno.
