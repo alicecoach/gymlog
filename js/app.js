@@ -28,6 +28,11 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 8, date: '2026-10-09', items: [
+      '🔥 <b>Calentamiento</b> antes de entrenar (~6 min): cardio suave y movilidad de lo que vas a trabajar hoy. Con modo guiado: la app te cronometra cada paso.',
+      '🧘 <b>Estiramientos</b> al terminar (~5 min), suaves y adaptados a si has hecho tren superior, inferior o completo. Si no te apetece, «Hoy no» y listo. Se quita en ⚙️ Ajustes.',
+      '✨ <b>Iconos nuevos</b>: más limpios y uniformes en toda la app.',
+    ] },
     { v: 7, date: '2026-10-09', items: [
       '📖 <b>Cómo se hace</b> con explicación: cada ejercicio trae ahora los pasos de la técnica en texto (y la ilustración animada en los que la tienen).',
       '🏃 <b>Fuera del gym</b>: registra correr, pádel, bici, natación, yoga… con su duración, esfuerzo y distancia. Lo tienes en Inicio, en tu historial y en el resumen del mes.',
@@ -74,7 +79,7 @@
     bg.className = 'sheet-bg';
     bg.innerHTML = `<div class="sheet" role="dialog" aria-label="Novedades"><div class="sheet-ic">✨</div><h2>Novedades en GymLog</h2>
       ${newsHTML(fresh.slice(0, 2))}<button class="btn primary block" data-act="news-ok">¡Genial!</button></div>`;
-    document.body.appendChild(bg);
+    document.body.appendChild(bg); Icons.upgrade(bg);
     requestAnimationFrame(() => bg.classList.add('show'));
   }
 
@@ -93,6 +98,7 @@
     ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «📅 Entreno pasado». Desde cada resumen puedes corregir pesos y fechas.'],
     ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
+    ['🧘', 'Calentar y estirar', 'Al empezar el entreno tienes un calentamiento de ~6 min y, al final, estiramientos suaves. Toca «Guiado» y la app te cronometra cada paso; o «Hoy no».'],
     ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],
     ['💾', 'Copia de seguridad', 'Tus datos viven solo en este móvil. Exporta una vez al mes y guárdala en Drive.'],
     ['⛔', 'Ejercicios a evitar', 'Si uno no te va bien (lesión, molestia), en su ficha toca «Evitar»: no te saldrá en rutinas generadas, alternativas ni entrenos rápidos.'],
@@ -164,6 +170,7 @@
   function toast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
+    Icons.upgrade(t);
     t.classList.add('show');
     clearTimeout(toast.t);
     toast.t = setTimeout(() => t.classList.remove('show'), 2600);
@@ -254,7 +261,7 @@
   // ---------- vistas ----------
   function viewHome() {
     const s = S(), r = activeRoutine(), u = Store.currentUser();
-    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> ${u.avatar}</p>` + cycleChip() + streakCard();
+    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> <span class="emo">${u.avatar}</span></p>` + cycleChip() + streakCard();
     if (backupDue()) {
       h += `<div class="card backup"><b>💾 Toca la copia de seguridad del mes</b>
         <small>Tu historial solo vive en este móvil. Guárdala en Drive o envíatela: con una vez al mes basta.</small>
@@ -561,7 +568,7 @@
     acts.forEach(x => { const k = x.type === 'otra' ? 'otra:' + Activity.title(x) : x.type; (by[k] = by[k] || []).push(x); });
     const mins = list => list.reduce((s, x) => s + (Number(x.mins) || 0), 0), km = list => list.reduce((s, x) => s + (Number(x.km) || 0), 0);
     return `<div class="card"><h3>🏃 Fuera del gym · ${acts.length}</h3>${Object.values(by).sort((x, y) => mins(y) - mins(x)).map(list => `<div class="hist-row">
-      <span class="grow">${Activity.type(list[0]).icon} ${esc(Activity.title(list[0]))}${list.length > 1 ? ` <small class="muted">× ${list.length}</small>` : ''}</span>
+      <span class="grow"><span class="emo">${Activity.type(list[0]).icon}</span> ${esc(Activity.title(list[0]))}${list.length > 1 ? ` <small class="muted">× ${list.length}</small>` : ''}</span>
       <span><b>${fmtDur(mins(list) * 60000)}</b>${km(list) ? ` <small class="muted">${fmtNum(km(list))} km</small>` : ''}</span></div>`).join('')}
       <p class="muted small">${fmtDur(mins(acts) * 60000)} en total.</p></div>`;
   }
@@ -1042,6 +1049,25 @@
 
   const sugIcon = t => ({ up: '⬆️', keep: '➡️', stall: '⚠️', down: '⬇️', first: '🆕', deload: '🔋' }[t] || '');
 
+  // ---------- calentamiento y estiramientos (opcionales) ----------
+  let guide = null; // { kind, i }: paso en marcha del modo guiado
+  const prepRegion = w => regionOf(w.exercises.map(e => [e.exId, e.sets.length])) || 'full';
+  const prepOn = w => S().settings.prep !== false && !w.past && !['hiit', 'movilidad'].includes(w.type);
+  function prepCard(w, kind) {
+    const st = w.prep?.[kind], K = Prep.KINDS[kind], region = prepRegion(w), items = Prep.plan(kind, region), run = guide?.kind === kind;
+    if (st === 'skip') return '';
+    if (st === 'done') return `<div class="prep-done">✅ ${K.done}</div>`;
+    const steps = `<ol class="prep-steps">${items.map((s, i) => `<li class="${run && i < guide.i ? 'ok' : run && i === guide.i ? 'now' : ''}">
+      <div><b>${esc(s.name)}</b><span>${fmtRest(s.secs)}${s.sides ? ' por lado' : ''}</span></div>${!run || i === guide.i ? `<small>${esc(s.cue)}</small>` : ''}</li>`).join('')}</ol>`;
+    return `<section class="card prep ${kind} ${run ? 'run' : ''}"><div class="prep-head"><div class="prep-ic">${K.icon}</div><div class="grow"><b>${K.title}</b>
+        <small>~${Prep.mins(items)} min · ${Prep.REGION[region]}</small></div></div>
+      ${run ? steps : `<p class="muted small">${K.note}</p><details class="prep-list"><summary>Ver los ${items.length} ejercicios</summary>${steps}</details>`}
+      ${run ? `<div class="row gap"><button class="btn small" data-act="prep-next">⏭ Siguiente</button><button class="btn small ghost" data-act="prep-stop">Parar</button></div>`
+        : `<div class="row gap"><button class="btn small primary" data-act="prep-go" data-k="${kind}">▶ Guiado</button>
+          <button class="btn small ghost" data-act="prep-mark" data-k="${kind}" data-v="done">Ya lo he hecho</button>
+          <button class="btn small ghost" data-act="prep-mark" data-k="${kind}" data-v="skip">Hoy no</button></div>`}</section>`;
+  }
+
   function viewWorkout() {
     const w = S().activeWorkout;
     if (!w) {
@@ -1060,6 +1086,9 @@
     if (w.past) h += `<div class="card past-note">📅 Estás anotando un entreno pasado: rellena lo que hiciste y marca ✓ cada serie. Sin descansos ni cronómetro.</div>`;
     const notes = routineById(w.routineId)?.notes;
     if (notes) h += `<details class="card notes"><summary>📝 Notas de la rutina</summary><p>${esc(notes).replace(/\n/g, '<br>')}</p></details>`;
+    // El calentamiento se ofrece hasta que empiezas a marcar series; después solo queda el "hecho".
+    const started = w.exercises.some(e => e.sets.some(s => s.done));
+    if (prepOn(w) && (!started || w.prep?.warm === 'done' || guide?.kind === 'warm')) h += prepCard(w, 'warm');
     w.exercises.forEach((e, ei) => { h += exerciseCard(e, ei); });
     const hasCore = w.exercises.some(e => Store.exercise(e.exId).pattern === 'core');
     if (!hasCore && !w.coreAsked && ['rutina', 'fullbody', 'pierna', 'torso'].includes(w.type || 'rutina')) {
@@ -1067,6 +1096,7 @@
         <small>3 ejercicios · ~6 min</small></div>
         <div class="row gap"><button class="btn small primary" data-act="add-core">Añadir</button><button class="btn small ghost" data-act="skip-core">Hoy no</button></div></div>`;
     }
+    if (prepOn(w) && w.exercises.length) h += prepCard(w, 'cool');
     h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a>
       <button class="btn block ghost danger" data-act="discard">Descartar entreno</button>`;
     return h;
@@ -1239,6 +1269,7 @@
     const kg = Nutrition.lifted(w);
     let h = `<div class="card hero sum"><div class="day-ic big">${workoutIcon(w)}</div><h2>${esc(w.dayName)}</h2>
       <p class="muted">${fmtDate(w.start)} · ${fmtDur(w.end - w.start)}</p>
+      ${w.prep ? `<p class="prep-chips">${['warm', 'cool'].filter(k => w.prep[k] === 'done').map(k => `<span>${Prep.KINDS[k].icon} ${Prep.KINDS[k].title}</span>`).join('')}</p>` : ''}
       <a class="btn small ghost edit-w" href="#/editar/${w.id}">✏️ Corregir pesos, series o fecha</a>`;
     const cy = Cycle.at(w.start);
     if (cy) h += `<a class="cycle-chip small ${cy.phase ? 'ph-' + cy.phase : ''}" href="#/ciclo">${cy.phase ? Cycle.PHASES[cy.phase].icon : '🌙'} ${Cycle.label(cy)}</a>`;
@@ -1305,6 +1336,8 @@
     // Lo hecho fuera del gym los 3 días anteriores (cansancio acumulado para el asistente).
     const acts = Activity.between(w.start - 3 * 864e5, w.start);
     if (acts.length) L.push(`Fuera del gym los 3 días anteriores: ${acts.map(a => `${Activity.title(a).toLowerCase()} ${actMeta(a)} (${agoTxt(a.start)})`).join('; ')}`);
+    const prep = ['warm', 'cool'].filter(k => w.prep?.[k] === 'done').map(k => Prep.KINDS[k].title.toLowerCase());
+    if (prep.length) L.push(`Hecho además: ${prep.join(' y ')}`);
     if (w.type === 'hiit') L.push(`HIIT: ${w.hiit?.rounds} rondas de ${w.hiit?.work} s trabajo / ${w.hiit?.rest} s descanso`);
     w.exercises.forEach((e, i) => {
       const ex = Store.exercise(e.exId), st = Store.exSettings(e.exId), t = e.target || {};
@@ -1460,13 +1493,14 @@
 
   function viewSettings() {
     const u = Store.currentUser();
-    return `<a class="card row between" href="#/usuarios"><div class="day-ic">${u.avatar}</div><div class="grow" style="margin-left:12px"><b>${esc(u.name)}</b>
+    return `<a class="card row between" href="#/usuarios"><div class="day-ic emo">${u.avatar}</div><div class="grow" style="margin-left:12px"><b>${esc(u.name)}</b>
         <small>Perfil activo · cambiar o añadir persona</small></div><span class="chev">›</span></a>
       <div class="card" id="body-card"><h2>Mis datos</h2>${bodyFields(false)}<div id="energy">${energyHTML()}</div></div>
       ${cycleSettings()}
       <div class="card"><h2>Ajustes</h2>
       <label>Descanso por defecto (s)<input type="number" id="s-rest" value="${S().settings.restDefault}"></label>
-      <label class="check-row"><input type="checkbox" id="s-awake" ${S().settings.keepAwake !== false ? 'checked' : ''}> Mantener la pantalla encendida durante el entreno</label></div>
+      <label class="check-row"><input type="checkbox" id="s-awake" ${S().settings.keepAwake !== false ? 'checked' : ''}> Mantener la pantalla encendida durante el entreno</label>
+      <label class="check-row"><input type="checkbox" id="s-prep" ${S().settings.prep !== false ? 'checked' : ''}> Proponer calentamiento al empezar y estiramientos al terminar</label></div>
       <details class="card howto"><summary><b>💡 Cómo sacarle partido</b><small>Consejos rápidos de uso</small></summary>
         ${HOWTO.map(([i, t, d]) => `<div class="howto-row"><span class="howto-ic">${i}</span><div><b>${t}</b><small>${d}</small></div></div>`).join('')}</details>
       <details class="card news"><summary><b>✨ Novedades</b><small>Lo último que ha llegado a la app</small></summary>${newsHTML(NEWS)}</details>
@@ -1481,7 +1515,7 @@
       <div class="row gap"><button class="btn" data-act="export">Exportar</button>
       <label class="btn file-btn">Importar<input type="file" accept="application/json,.json" id="import" hidden></label></div></div>
       <div class="card"><button class="btn ghost danger" data-act="reset">Borrar los datos de ${esc(u.name)}</button></div>
-      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Pictogramas propios. Ilustraciones de técnica: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (CC BY-SA 4.0).</p>`;
+      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Pictogramas propios. Iconos: <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC). Ilustraciones de técnica: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (CC BY-SA 4.0).</p>`;
   }
 
   // ---------- usuarios ----------
@@ -1512,7 +1546,7 @@
     const cur = Store.currentUser();
     return '<h2>Personas en este móvil</h2>' + Store.getUsers().list.map(u => {
       const n = (JSON.parse(localStorage.getItem(`gymlog.u.${u.id}`) || '{}').workouts || []).length;
-      return `<div class="card day ${u.id === cur.id ? 'next' : ''}"><div class="day-ic">${u.avatar}</div><div class="grow"><b>${esc(u.name)}</b>
+      return `<div class="card day ${u.id === cur.id ? 'next' : ''}"><div class="day-ic emo">${u.avatar}</div><div class="grow"><b>${esc(u.name)}</b>
         <small>${n} entrenos${u.id === cur.id ? ' · perfil activo' : ''}</small></div>
         ${u.id === cur.id ? `<button class="icon" data-act="rename-user" data-id="${u.id}" title="Cambiar nombre">✏️</button>`
           : `<button class="btn small primary" data-act="switch-user" data-id="${u.id}">Usar</button>
@@ -1528,11 +1562,11 @@
     const wk = Activity.between(weekStart(Date.now()), Infinity), mins = wk.reduce((s, a) => s + (Number(a.mins) || 0), 0);
     return `<div class="section-head"><h2>Fuera del gym</h2><small>${wk.length ? `esta semana: ${wk.length} · ${fmtDur(mins * 60000)}` : 'correr, pádel, bici…'}</small></div>
       <div class="act-chips">${['correr', 'padel', 'caminar', 'bici', 'nadar', 'yoga', 'otra'].map(k => `<a class="act-chip" href="#/actividad/nueva/${k}">
-        <span>${Activity.TYPES[k].icon}</span>${k === 'otra' ? 'Otra…' : Activity.TYPES[k].label.split(' /')[0]}</a>`).join('')}</div>`;
+        <span class="emo">${Activity.TYPES[k].icon}</span>${k === 'otra' ? 'Otra…' : Activity.TYPES[k].label.split(' /')[0]}</a>`).join('')}</div>`;
   }
   function activityItem(a) {
     const k = Activity.kcal(a);
-    return `<a class="list-item act-item" href="#/actividad/${a.id}"><div class="day-ic sm">${Activity.type(a).icon}</div><div class="grow"><b>${esc(Activity.title(a))}</b>
+    return `<a class="list-item act-item" href="#/actividad/${a.id}"><div class="day-ic sm emo">${Activity.type(a).icon}</div><div class="grow"><b>${esc(Activity.title(a))}</b>
       <small>${fmtDate(a.start)} · ${actMeta(a)}${k ? ` · ${k.est ? '~' : ''}${k.v} kcal` : ''}</small></div><span class="chev">›</span></a>`;
   }
   function viewActivity(id, preset) {
@@ -1541,10 +1575,10 @@
     const v = a || { type: Activity.TYPES[preset] ? preset : 'correr', start: Date.now(), mins: 60, effort: 2 };
     const t = Activity.type(v), show = c => c ? '' : 'style="display:none"';
     const k = a && Activity.kcal(a), pace = a && Activity.pace(a);
-    return `<div class="card act-form"><h2>${a ? `${t.icon} ${esc(Activity.title(a))}` : '🏃 Fuera del gym'}</h2>
+    return `<div class="card act-form"><h2>${a ? `<span class="emo">${t.icon}</span> ${esc(Activity.title(a))}` : '🏃 Fuera del gym'}</h2>
       ${a && (k || pace) ? `<p class="muted small">${[pace, k ? `${k.est ? '~' : ''}${k.v} kcal${k.est ? ' (estimadas)' : ''}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
       <div class="act-types">${Object.entries(Activity.TYPES).map(([key, x]) => `<label class="act-type"><input type="radio" name="a-type" value="${key}" ${key === v.type ? 'checked' : ''}>
-        <span>${x.icon}</span><small>${x.label}</small></label>`).join('')}</div>
+        <span class="emo">${x.icon}</span><small>${x.label}</small></label>`).join('')}</div>
       <label id="a-name-row" ${show(v.type === 'otra')}>¿Qué hiciste?<input id="a-name" value="${esc(v.name)}" placeholder="p. ej. esquí, surf, kayak…"></label>
       <div class="rx-fields two">
         <label>Fecha<input type="date" id="a-date" max="${ymd(Date.now())}" value="${ymd(v.start)}"></label>
@@ -1609,6 +1643,7 @@
     const y = window.scrollY;
     $app.innerHTML = route[1](...m.slice(1));
     document.getElementById('title').textContent = route[3];
+    Icons.upgrade($app);
     document.querySelectorAll('.tabbar a').forEach(a => a.classList.toggle('on', a.dataset.tab === route[2]));
     justDone = null;
     syncWakeLock();
@@ -1678,6 +1713,7 @@
         fired = true;
         if (phase.onEnd) { clearInterval(int); phase.onEnd(); return; }
         label.textContent = '¡A por la siguiente serie! 💪';
+        Icons.upgrade(label);
         bar.style.width = '0%';
         el.classList.add('ready');
         navigator.vibrate && navigator.vibrate([300, 150, 300]);
@@ -1706,6 +1742,22 @@
           } });
         } });
       },
+      // Tramos seguidos (calentamiento, estiramientos): onStep(i) al empezar cada uno y onDone al terminar todos.
+      seq(steps, onStep, onDone, onCancel) {
+        const c = this.onCancel; this.onCancel = onCancel; c && c();
+        const run = i => {
+          if (i >= steps.length) {
+            this.onCancel = null; clearInterval(int); el.classList.add('hidden'); el.classList.remove('holding');
+            beep(660, 0.5); navigator.vibrate && navigator.vibrate([400, 150, 400]);
+            return onDone();
+          }
+          if (i) { beep(1040, 0.2); navigator.vibrate && navigator.vibrate(200); }
+          onStep(i);
+          begin({ secs: steps[i].secs, hold: true, beeps: true, label: l => `${steps[i].name} · ${mmss(l)}`, onEnd: () => run(i + 1) });
+        };
+        run(0);
+      },
+      skip() { endAt = Date.now(); tick(); },
       add(sec) { endAt += sec * 1000; total = Math.max(total + sec, 1); fired = false; el.classList.remove('ready'); tick(); },
       stop() {
         clearInterval(int); el.classList.add('hidden'); el.classList.remove('holding');
@@ -1894,6 +1946,15 @@
       w.coreAsked = true; save(); render(true); toast('Core añadido al final 🎯');
     },
     'skip-core': () => { S().activeWorkout.coreAsked = true; save(); render(true); },
+    'prep-go': el => {
+      const w = S().activeWorkout, kind = el.dataset.k, steps = Prep.seq(Prep.plan(kind, prepRegion(w)));
+      Timer.seq(steps, i => { guide = { kind, i: steps[i].src }; render(true); },
+        () => { guide = null; (w.prep = w.prep || {})[kind] = 'done'; save(); render(true); toast(kind === 'warm' ? '¡Listo! A por el primer ejercicio 💪' : 'Estiramientos hechos. ¡Buen trabajo! 🧘'); },
+        () => { guide = null; render(true); });
+    },
+    'prep-next': () => Timer.skip(),
+    'prep-stop': () => Timer.stop(),
+    'prep-mark': el => { const w = S().activeWorkout; (w.prep = w.prep || {})[el.dataset.k] = el.dataset.v; save(); render(true); },
     'hiit-toggle': () => {
       if (Hiit.running) {
         Hiit.running = false; Hiit.left = Math.max(0, (Hiit.endAt - Date.now()) / 1000); clearInterval(Hiit.int);
@@ -1918,6 +1979,8 @@
         if (!e.pain?.length) delete e.pain;
         if (!e.memo) delete e.memo;
       });
+      // Del calentamiento y los estiramientos solo se guarda lo hecho.
+      if (w.prep) { Object.keys(w.prep).forEach(k => w.prep[k] !== 'done' && delete w.prep[k]); if (!Object.keys(w.prep).length) delete w.prep; }
       w.exercises = w.exercises.filter(e => e.sets.length);
       w.end = w.past ? w.start + w.past * 60000 : Date.now();
       delete w.past;
@@ -2069,6 +2132,7 @@
       S().activeWorkout.exercises[d.memo].memo = t.value.trim(); save();
     } else if ('exsWu' in d) { Store.setExSettings(d.id, { warmup: t.checked }); }
     else if (t.id === 's-awake') { S().settings.keepAwake = t.checked; save(); syncWakeLock(); }
+    else if (t.id === 's-prep') { S().settings.prep = t.checked; save(); }
     else if (d.ms) { /* campos del formulario de medidas: se guardan con el botón */ }
     else if ('xs' in d) { routineOf(t).days[d.di].exercises[d.xi].superset = t.checked; save(); }
     else if (d.xf) { routineOf(t).days[d.di].exercises[d.xi][d.xf] = val; save(); }
@@ -2078,7 +2142,7 @@
     else if (d.kcal) {
       const w = S().workouts.find(x => x.id === d.kcal);
       w.kcal = val; save();
-      document.getElementById('nutri').innerHTML = nutritionHTML(w);
+      document.getElementById('nutri').innerHTML = nutritionHTML(w); Icons.upgrade(document.getElementById('nutri'));
       document.getElementById('sum-text').value = summaryText(w);
     }
     else if (d.photo && t.files[0]) savePhoto(d.photo, t.files[0]);
@@ -2096,7 +2160,7 @@
       else { S().profile = Object.assign({ brands: Generator.BRANDS.slice() }, S().profile, { [d.body]: d.body === 'days' ? Number(t.value) : t.value }); }
       save();
       if (d.body === 'sex') return render(true); // muestra u oculta el seguimiento del ciclo
-      document.getElementById('energy').innerHTML = energyHTML();
+      document.getElementById('energy').innerHTML = energyHTML(); Icons.upgrade(document.getElementById('energy'));
     }
     else if (d.cy) { S().cycle[d.cy] = t.checked; save(); render(true); }
     else if (t.id === 'import-routine' && t.files[0]) importRoutineFile(t.files[0], res => res && go('#/rutina/' + res.routine.id));
@@ -2128,6 +2192,7 @@
   }
 
   if (Store.currentUser()) Store.migrate();
+  Icons.upgrade(document.querySelector('.topbar')); Icons.upgrade(document.querySelector('.tabbar'));
   render();
   if (Store.currentUser()) checkNews();
 

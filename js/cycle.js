@@ -2,7 +2,7 @@
 // Las fechas se guardan como 'AAAA-MM-DD' (día local) para no depender de la zona horaria.
 const Cycle = (() => {
   const DAY = 864e5;
-  const ENERGY = { 1: { icon: '😴', label: 'Sin pilas' }, 2: { icon: '😐', label: 'Normal' }, 3: { icon: '🙂', label: 'Bien' }, 4: { icon: '💪', label: '¡A tope!' } };
+  const ENERGY = { 1: { icon: '😴', label: 'Sin pilas' }, 2: { icon: '😐', label: 'Normal' }, 3: { icon: '🙂', label: 'Bien' }, 4: { icon: '🤩', label: '¡A tope!' } };
   const PHASES = {
     menstrual: { label: 'menstrual', icon: '🌑',
       note: 'Hay días de regla en los que apetece todo y otros en los que no: las dos cosas son normales. Moverte suele aliviar el dolor y subir el ánimo.',

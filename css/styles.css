@@ -600,3 +600,36 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .cal-d.act:not(.on) { background: rgba(52, 211, 153, .22); color: var(--text); font-weight: 700; }
 .cal-d.on.act { box-shadow: inset 0 -4px 0 #34d399; }
 .act-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: #34d399; vertical-align: middle; }
+
+/* ---------- iconos de línea (Lucide + pictogramas propios) ---------- */
+.ei { width: 1.2em; height: 1.2em; display: inline-block; vertical-align: -.22em; flex: none; }
+.ei.t-hot { color: var(--accent2); } .ei.t-warn { color: var(--warn); } .ei.t-ok { color: var(--ok); } .ei.t-bad { color: var(--bad); }
+.btn.primary .ei, .qcard .ei, .card.day.next .day-ic .ei, .prep-ic .ei, .tabbar .ei { color: inherit; }
+.day-ic { color: var(--accent2); }
+.card.day.next .day-ic { color: #fff; }
+.tabbar .ti { filter: none; opacity: .75; }
+.tabbar a.on .ti { color: var(--accent); }
+.memo-btn { color: var(--warn); }
+.memo-btn .ei, .swap-btn .ei, .icon .ei { width: 1.15em; height: 1.15em; }
+
+/* ---------- calentamiento y estiramientos ---------- */
+.prep-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.prep-head small { display: block; color: var(--muted); }
+.prep-ic { width: 44px; height: 44px; flex: none; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #fff; background: var(--g-power); }
+.prep.cool .prep-ic { background: var(--g-core); }
+.card.prep.warm { border-color: rgba(255, 154, 61, .35); }
+.card.prep.cool { border-color: rgba(167, 123, 255, .4); }
+.card.prep.run { box-shadow: 0 0 0 1px rgba(255, 106, 43, .35), 0 10px 24px rgba(0, 0, 0, .3); }
+.prep-list summary { cursor: pointer; color: var(--accent2); font-weight: 600; font-size: .85rem; margin: 4px 0 8px; }
+.prep-steps { list-style: none; padding: 0; margin: 6px 0 10px; }
+.prep-steps li { padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, .02); margin-bottom: 6px; transition: opacity .3s, background .3s; }
+.prep-steps li div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.prep-steps li span { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+.prep-steps li small { display: block; color: var(--muted); font-size: .8rem; margin-top: 3px; line-height: 1.35; }
+.prep-steps li.ok { opacity: .45; }
+.prep-steps li.ok b::before { content: "✓ "; color: var(--ok); }
+.prep-steps li.now { border-color: rgba(255, 106, 43, .6); background: rgba(255, 106, 43, .1); }
+.prep-steps li.now small { color: var(--text); }
+.prep-done { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .85rem; margin: 0 4px 12px; }
+.prep-chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 4px 0 10px; }
+.prep-chips span { background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .78rem; }

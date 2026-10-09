@@ -54,5 +54,45 @@ const Icons = (() => {
     return '🏋️';
   }
 
-  return { svg, tile, P, GROUP, DAY, dayIconFor };
+  // Emojis de interfaz → iconos de línea (Lucide o un pictograma propio "p:"). Los de contenido
+  // (avatares, medallas, deportes, ánimo, ciclo) no están aquí y se quedan como emoji.
+  const UI = {
+    '🏠': 'house', '🏋️': 'dumbbell', '📋': 'clipboard-list', '🔎': 'search', '📈': 'trending-up', '⚙️': 'settings',
+    '📝': 'notebook-pen', '⇄': 'arrow-left-right', '📖': 'book-open', '🎬': 'book-open', '⚠️': 'triangle-alert',
+    '⬆️': 'arrow-up', '➡️': 'arrow-right', '⬇️': 'arrow-down', '🆕': 'sparkles', '🔋': 'battery-charging',
+    '📅': 'calendar', '🗓️': 'calendar-days', '📆': 'calendar-range', '📏': 'ruler', '💡': 'lightbulb', '✨': 'sparkles',
+    '💾': 'save', '📥': 'download', '📊': 'chart-column', '🔗': 'link', '✏️': 'pencil', '🗑': 'trash-2', '⏱': 'timer',
+    '📷': 'camera', '⚖️': 'scale', '⛔': 'ban', '✅': 'circle-check', '🎯': 'target', '🛟': 'life-buoy', '👥': 'users',
+    '📲': 'smartphone', '🔥': 'flame', '⚡': 'zap', '💪': 'biceps-flexed', '🍽️': 'utensils', '🏆': 'trophy',
+    '🐾': 'paw-print', '🧗': 'mountain', '🫀': 'heart-pulse', '⭐': 'star', '🎉': 'party-popper', '🏅': 'medal',
+    '⏭': 'skip-forward', '▶': 'play', '🌱': 'sprout', '🌡️': 'thermometer',
+    '🍑': 'p:hinge', '🦵': 'p:squat', '🤸': 'p:power', '🧘': 'p:mobility',
+  };
+  const TINT = { flame: 'hot', sparkles: 'hot', 'triangle-alert': 'warn', lightbulb: 'warn', trophy: 'warn', medal: 'warn',
+    ban: 'bad', 'circle-check': 'ok', 'trending-up': 'ok', 'arrow-up': 'ok', sprout: 'ok' };
+  const uiSvg = name => name.startsWith('p:')
+    ? `<svg class="ei pg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name.slice(2)]}</svg>`
+    : `<svg class="ei${TINT[name] ? ' t-' + TINT[name] : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`;
+  const base = s => s.replace(/️/g, '');
+  const KEYS = Object.keys(UI).map(base).sort((a, b) => b.length - a.length);
+  const UIB = Object.fromEntries(Object.entries(UI).map(([k, v]) => [base(k), v]));
+  // Sin tocar las secuencias con ZWJ (🏋️‍♀️) ni los modificadores de género.
+  const RE = new RegExp(`(?:${KEYS.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\uFE0F?(?![\\uFE0F\\u200D])`, 'gu');
+  const SKIP = 'textarea, option, select, script, style, svg, .emo, .mi, .avatars, .emojis';
+  const escT = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  function upgrade(root) {
+    if (!root) return;
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
+    for (let n; (n = tw.nextNode());) {
+      RE.lastIndex = 0;
+      if (RE.test(n.data) && !n.parentElement.closest(SKIP)) nodes.push(n);
+    }
+    nodes.forEach(n => {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = escT(n.data).replace(RE, m => uiSvg(UIB[base(m)]));
+      n.replaceWith(tpl.content);
+    });
+  }
+
+  return { svg, tile, P, GROUP, DAY, dayIconFor, upgrade };
 })();
