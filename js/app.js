@@ -28,6 +28,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 7, date: '2026-10-09', items: [
+      '📖 <b>Cómo se hace</b> con explicación: cada ejercicio trae ahora los pasos de la técnica en texto (y la ilustración animada en los que la tienen).',
+      '🏃 <b>Fuera del gym</b>: registra correr, pádel, bici, natación, yoga… con su duración, esfuerzo y distancia. Lo tienes en Inicio, en tu historial y en el resumen del mes.',
+    ] },
     { v: 6, date: '2026-10-08', items: [
       '🎬 <b>Cómo se hace</b>: unos 140 ejercicios traen una ilustración animada de la técnica (posición inicial y final). Está en su ficha y, durante el entreno, en «🎬 Cómo se hace».',
     ] },
@@ -83,10 +87,11 @@
     ['⇄', '¿Máquina ocupada?', 'Toca ⇄ en el ejercicio: alternativas que trabajan lo mismo, solo para hoy.'],
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
     ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
-    ['🎬', 'Cómo se hace', 'En los ejercicios que la tienen, toca «🎬 Cómo se hace» en el entreno o abre su ficha: ilustración animada de la técnica.'],
+    ['📖', 'Cómo se hace', 'Toca «📖 Cómo se hace» en el entreno o abre la ficha del ejercicio: los pasos de la técnica y, en muchos, una ilustración animada.'],
+    ['🏃', 'Fuera del gym', 'Correr, pádel, bici, yoga…: regístralo desde Inicio → «Fuera del gym». Sale en tu historial y en el resumen del mes, pero no cuenta para la racha de entrenos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
     ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
-    ['📅', '¿Se te olvidó anotar?', 'Historial → «Registrar un entreno de otro día». Desde cada resumen puedes corregir pesos y fechas.'],
+    ['📅', '¿Se te olvidó anotar?', 'Historial → «📅 Entreno pasado». Desde cada resumen puedes corregir pesos y fechas.'],
     ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
     ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],
     ['💾', 'Copia de seguridad', 'Tus datos viven solo en este móvil. Exporta una vez al mes y guárdala en Drive.'],
@@ -143,6 +148,12 @@
     const ek = DEMOS[exId];
     return ek ? `<div class="demo" role="img" aria-label="Cómo se hace: posición inicial y final"><img src="img/ek/${ek}-a.png" alt="" loading="lazy"><img class="b" src="img/ek/${ek}-b.png" alt="" loading="lazy"></div>
       <small class="demo-credit">Ilustración: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> · CC BY-SA 4.0</small>` : '';
+  }
+  // Cómo se hace: la ilustración (si la hay) y los pasos de técnica.
+  const hasHowto = exId => !!DEMOS[exId] || Tech.has(Store.exercise(exId));
+  function howtoHTML(exId) {
+    const steps = Tech.steps(Store.exercise(exId));
+    return demoHTML(exId) + (steps ? `<ol class="tech">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : '');
   }
   function thumb(exId, cls = '') {
     const p = S().photos[exId];
@@ -276,6 +287,7 @@
     h += `<div class="section-head"><h2>Entreno rápido</h2><small>para días especiales</small></div><div class="quick">` +
       Object.entries(Quick.TYPES).map(([k, t]) => `<button class="qcard g-${t.grad}" data-act="quick" data-type="${k}">
         <span class="qi">${t.icon}</span><b>${t.label}</b><small>${t.desc}</small></button>`).join('') + '</div>';
+    h += activityHome();
 
     const weekAgo = Date.now() - 7 * 864e5;
     const wk = s.workouts.filter(w => w.start > weekAgo);
@@ -540,7 +552,18 @@
     const rated = ws.filter(w => w.energy);
     return { ws, kg: ws.reduce((s, w) => s + Nutrition.lifted(w), 0), sets: ws.reduce((s, w) => s + doneSets(w), 0),
       ms: ws.reduce((s, w) => s + (w.end - w.start), 0), energy: rated.length ? rated.reduce((s, w) => s + w.energy, 0) / rated.length : 0,
-      days: new Set(ws.map(w => startOfDay(w.start))) };
+      days: new Set(ws.map(w => startOfDay(w.start))), acts: Activity.between(a, b) };
+  }
+  // Fuera del gym en el mes: total y desglose por tipo.
+  function monthActsCard(acts) {
+    if (!acts.length) return '';
+    const by = {};
+    acts.forEach(x => { const k = x.type === 'otra' ? 'otra:' + Activity.title(x) : x.type; (by[k] = by[k] || []).push(x); });
+    const mins = list => list.reduce((s, x) => s + (Number(x.mins) || 0), 0), km = list => list.reduce((s, x) => s + (Number(x.km) || 0), 0);
+    return `<div class="card"><h3>🏃 Fuera del gym · ${acts.length}</h3>${Object.values(by).sort((x, y) => mins(y) - mins(x)).map(list => `<div class="hist-row">
+      <span class="grow">${Activity.type(list[0]).icon} ${esc(Activity.title(list[0]))}${list.length > 1 ? ` <small class="muted">× ${list.length}</small>` : ''}</span>
+      <span><b>${fmtDur(mins(list) * 60000)}</b>${km(list) ? ` <small class="muted">${fmtNum(km(list))} km</small>` : ''}</span></div>`).join('')}
+      <p class="muted small">${fmtDur(mins(acts) * 60000)} en total.</p></div>`;
   }
   function viewMonth(key) {
     key = key || monthKey(Date.now());
@@ -548,7 +571,15 @@
     const nav = `<div class="month-nav"><a class="icon" href="#/mes/${shiftMonth(key, -1)}" aria-label="Mes anterior">‹</a>
       <h2>${monthName(key)[0].toUpperCase() + monthName(key).slice(1)} ${key.slice(0, 4)}</h2>
       ${key < cur ? `<a class="icon" href="#/mes/${shiftMonth(key, 1)}" aria-label="Mes siguiente">›</a>` : '<span class="icon"></span>'}</div>`;
-    if (!st.ws.length) return nav + `<div class="card hero"><div class="day-ic big">📅</div><p class="muted">Sin entrenos este mes${key === cur ? ' todavía. ¡El primero cuenta doble!' : '.'}</p></div>`;
+    // Calendario del mes: un cuadrito por día, encendido si entrenaste (y marcado si hiciste algo fuera del gym).
+    const first = new Date(a), offset = (first.getDay() + 6) % 7, n = Math.round((b - a) / 864e5);
+    const today = startOfDay(Date.now()), actDays = new Set(st.acts.map(x => startOfDay(x.start)));
+    const cal = `<div class="card"><h3>🗓️ Tus días</h3><div class="cal">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-h">${d}</span>`).join('')}
+      ${'<span></span>'.repeat(offset)}${Array.from({ length: n }, (_, i) => { const t = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
+        return `<span class="cal-d ${st.days.has(t) ? 'on' : ''} ${actDays.has(t) ? 'act' : ''} ${t === today ? 'today' : ''} ${t > today ? 'future' : ''}">${i + 1}</span>`; }).join('')}</div>
+      <p class="muted small">${st.days.size} ${st.days.size === 1 ? 'día entrenado' : 'días entrenados'}${actDays.size ? ` · <span class="act-key"></span> ${actDays.size} con actividad fuera del gym` : ''}.</p></div>`;
+    if (!st.ws.length) return nav + `<div class="card hero"><div class="day-ic big">📅</div><p class="muted">Sin entrenos este mes${key === cur ? ' todavía. ¡El primero cuenta doble!' : '.'}</p></div>`
+      + (st.acts.length ? cal + monthActsCard(st.acts) : '');
     // Comparar con un mes casi vacío daría porcentajes absurdos: solo si el anterior tuvo 4+ entrenos.
     const pct = (x, y) => y && prev.ws.length >= 4 ? Math.round((x / y - 1) * 100) : null;
     const delta = (x, y) => { const p = pct(x, y); return p ? `<small class="delta ${p > 0 ? 'pos' : 'neg'}">${p > 0 ? '▲' : '▼'} ${Math.abs(p)} %</small>` : ''; };
@@ -558,13 +589,7 @@
       <p class="lift-cmp">¡${fmtNum(c.count)} ${c.name} ${c.emoji}!</p>${prev.kg && prev.ws.length >= 4 ? `<p class="muted small">vs. ${monthName(shiftMonth(key, -1))}: ${delta(st.kg, prev.kg) || 'igual'}</p>` : ''}
       <div class="stats inner"><div><b>${st.ws.length}</b><small>entrenos</small>${delta(st.ws.length, prev.ws.length)}</div>
       <div><b>${st.sets}</b><small>series</small></div><div><b>${fmtDur(st.ms)}</b><small>entrenando</small></div></div></div>`;
-    // Calendario del mes: un cuadrito por día, encendido si entrenaste.
-    const first = new Date(a), offset = (first.getDay() + 6) % 7, n = Math.round((b - a) / 864e5);
-    const today = startOfDay(Date.now());
-    h += `<div class="card"><h3>🗓️ Tus días</h3><div class="cal">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-h">${d}</span>`).join('')}
-      ${'<span></span>'.repeat(offset)}${Array.from({ length: n }, (_, i) => { const t = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
-        return `<span class="cal-d ${st.days.has(t) ? 'on' : ''} ${t === today ? 'today' : ''} ${t > today ? 'future' : ''}">${i + 1}</span>`; }).join('')}</div>
-      <p class="muted small">${st.days.size} ${st.days.size === 1 ? 'día entrenado' : 'días entrenados'}.</p></div>`;
+    h += cal + monthActsCard(st.acts);
     const prs = prEvents().filter(x => x.w.start >= a && x.w.start < b), byEx = {};
     prs.forEach(x => { if (!byEx[x.e.exId] || x.v > byEx[x.e.exId].v) byEx[x.e.exId] = Object.assign({}, x, { first: byEx[x.e.exId]?.first ?? x.prev }); });
     const top = Object.values(byEx).sort((x, y) => (y.v / y.first) - (x.v / x.first));
@@ -924,7 +949,7 @@
       ${photo ? `<button class="btn small ghost" data-act="del-photo" data-id="${id}">Quitar foto</button>` : ''}
       ${ex.custom ? `<button class="btn small ghost danger" data-act="del-custom" data-id="${id}">Borrar máquina</button>` : ''}
       <button class="btn small ghost" data-act="toggle-excl" data-id="${id}">${excluded().includes(id) ? '✅ Volver a permitir' : '⛔ Evitar este ejercicio'}</button></div></div>
-      ${DEMOS[id] ? `<div class="card demo-card"><h3>🎬 Cómo se hace</h3>${demoHTML(id)}</div>` : ''}
+      ${hasHowto(id) ? `<div class="card demo-card"><h3>📖 Cómo se hace</h3>${howtoHTML(id)}</div>` : ''}
       <div class="card"><h3>Carga</h3><div class="rx-fields two">
         <label>Cómo anoto el peso<select data-exs="mode" data-id="${id}">${Object.entries(Store.MODES).map(([k, v]) => `<option value="${k}" ${st.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}</div>
@@ -1100,8 +1125,8 @@
       <div class="target">${st.mode === 'tiempo' ? `<span>${t.sets} × ${fmtRest(Number(t.secs) || 30)}</span>`
         : `<span>${t.sets} × ${t.repMin}–${t.repMax}</span><span>RIR ${t.rir}</span>`}<span>⏱ ${fmtRest(t.rest)}</span></div>
       ${e.note ? `<div class="note">📝 ${esc(e.note)}</div>` : ''}
-      ${!DEMOS[e.exId] ? '' : demoOpen === ei ? `<div class="demo-inline">${demoHTML(e.exId)}<button class="btn small ghost block" data-act="demo-open" data-ei="${ei}">Ocultar</button></div>`
-        : `<button class="demo-btn" data-act="demo-open" data-ei="${ei}">🎬 Cómo se hace</button>`}
+      ${!hasHowto(e.exId) ? '' : demoOpen === ei ? `<div class="demo-inline">${howtoHTML(e.exId)}<button class="btn small ghost block" data-act="demo-open" data-ei="${ei}">Ocultar</button></div>`
+        : `<button class="demo-btn" data-act="demo-open" data-ei="${ei}">📖 Cómo se hace</button>`}
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>
       <div class="prev">Anterior: ${esc(prevTxt)}</div>${warm}
       <table class="sets ${st.mode === 'tiempo' ? 'hold' : st.mode === 'goma' ? 'band' : ''}">${setRows(e, ei, st.mode)}</table>
@@ -1277,6 +1302,9 @@
     if (w.energy) L.push(`Sensación: ${Cycle.ENERGY[w.energy].label.replace(/[¡!]/g, '').toLowerCase()} (${w.energy}/4)`);
     const cy = S().cycle.share && Cycle.at(w.start);
     if (cy) L.push(`Ciclo menstrual: ${Cycle.label(cy).toLowerCase()}`);
+    // Lo hecho fuera del gym los 3 días anteriores (cansancio acumulado para el asistente).
+    const acts = Activity.between(w.start - 3 * 864e5, w.start);
+    if (acts.length) L.push(`Fuera del gym los 3 días anteriores: ${acts.map(a => `${Activity.title(a).toLowerCase()} ${actMeta(a)} (${agoTxt(a.start)})`).join('; ')}`);
     if (w.type === 'hiit') L.push(`HIIT: ${w.hiit?.rounds} rondas de ${w.hiit?.work} s trabajo / ${w.hiit?.rest} s descanso`);
     w.exercises.forEach((e, i) => {
       const ex = Store.exercise(e.exId), st = Store.exSettings(e.exId), t = e.target || {};
@@ -1312,8 +1340,16 @@
 
   function viewHistory() {
     const ws = S().workouts.slice().sort((a, b) => b.start - a.start);
-    const pastBtn = '<a class="btn block ghost" href="#/pasado">📅 Registrar un entreno de otro día</a>';
-    if (!ws.length) return '<p class="muted">Todavía no has registrado entrenos.</p>' + pastBtn;
+    const pastBtn = `<div class="row gap hist-btns"><a class="btn ghost grow" href="#/pasado">📅 Entreno pasado</a><a class="btn ghost grow" href="#/actividad/nueva">🏃 Fuera del gym</a></div>`;
+    // Entrenos y actividades fuera del gym, juntos y por fecha.
+    const items = ws.map(w => ({ t: w.start, w })).concat(Activity.list().map(a => ({ t: a.start, a }))).sort((x, y) => y.t - x.t);
+    const list = items.map(({ w, a }) => {
+      if (a) return activityItem(a);
+      const kg = Nutrition.lifted(w);
+      return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
+        <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
+    }).join('');
+    if (!ws.length) return '<p class="muted">Todavía no has registrado entrenos.</p>' + pastBtn + list;
     const c = S().cycle;
     const cyLink = c.enabled && !c.hormonal && !c.irregular ? `<a class="card row between nudge" href="#/ciclo"><div class="grow"><b>📊 Tu patrón del ciclo</b>
       <small>Tu energía y tus récords en cada fase</small></div><span class="chev">›</span></a>` : '';
@@ -1321,11 +1357,7 @@
     const links = `<div class="link-grid"><a class="card nudge" href="#/mes"><b>📅 ${monthName(monthKey(Date.now()))[0].toUpperCase() + monthName(monthKey(Date.now())).slice(1)}</b>
         <small>${m.ws.length} ${m.ws.length === 1 ? 'entreno' : 'entrenos'} · resumen</small></a>
       <a class="card nudge" href="#/medidas"><b>📏 Medidas</b><small>${waist ? `Cintura ${fmtNum(waist.v)} cm` : 'Cintura, peso…'}</small></a></div>`;
-    return links + weekVolumeCard() + groupProgressCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + ws.map(w => {
-      const kg = Nutrition.lifted(w);
-      return `<a class="list-item" href="#/resumen/${w.id}"><div class="day-ic sm">${workoutIcon(w)}</div><div class="grow"><b>${esc(w.dayName)}${w.energy ? ' ' + Cycle.ENERGY[w.energy].icon : ''}</b>
-        <small>${fmtDate(w.start)} · ${fmtDur(w.end - w.start)} · ${doneSets(w)} series${kg ? ` · ${fmtNum(Math.round(kg))} kg` : ''}${w.kcal ? ` · ${w.kcal} kcal` : ''}</small></div><span class="chev">›</span></a>`;
-    }).join('');
+    return links + weekVolumeCard() + groupProgressCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + list;
   }
 
   const ymd = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -1489,6 +1521,58 @@
       <p class="muted small">Si cada uno usa su móvil, no hace falta: cada instalación guarda sus propios datos.</p>`;
   }
 
+  // ---------- fuera del gym ----------
+  // Actividad extra (correr, pádel…): va al historial y al resumen del mes, no a la racha ni a series y kilos.
+  const actMeta = a => [fmtDur(a.mins * 60000), a.km ? `${fmtNum(a.km)} km` : '', Activity.EFFORT[a.effort]?.label.toLowerCase()].filter(Boolean).join(' · ');
+  function activityHome() {
+    const wk = Activity.between(weekStart(Date.now()), Infinity), mins = wk.reduce((s, a) => s + (Number(a.mins) || 0), 0);
+    return `<div class="section-head"><h2>Fuera del gym</h2><small>${wk.length ? `esta semana: ${wk.length} · ${fmtDur(mins * 60000)}` : 'correr, pádel, bici…'}</small></div>
+      <div class="act-chips">${['correr', 'padel', 'caminar', 'bici', 'nadar', 'yoga', 'otra'].map(k => `<a class="act-chip" href="#/actividad/nueva/${k}">
+        <span>${Activity.TYPES[k].icon}</span>${k === 'otra' ? 'Otra…' : Activity.TYPES[k].label.split(' /')[0]}</a>`).join('')}</div>`;
+  }
+  function activityItem(a) {
+    const k = Activity.kcal(a);
+    return `<a class="list-item act-item" href="#/actividad/${a.id}"><div class="day-ic sm">${Activity.type(a).icon}</div><div class="grow"><b>${esc(Activity.title(a))}</b>
+      <small>${fmtDate(a.start)} · ${actMeta(a)}${k ? ` · ${k.est ? '~' : ''}${k.v} kcal` : ''}</small></div><span class="chev">›</span></a>`;
+  }
+  function viewActivity(id, preset) {
+    const a = id ? Activity.list().find(x => x.id === id) : null;
+    if (id && !a) return '<p>Actividad no encontrada.</p>';
+    const v = a || { type: Activity.TYPES[preset] ? preset : 'correr', start: Date.now(), mins: 60, effort: 2 };
+    const t = Activity.type(v), show = c => c ? '' : 'style="display:none"';
+    const k = a && Activity.kcal(a), pace = a && Activity.pace(a);
+    return `<div class="card act-form"><h2>${a ? `${t.icon} ${esc(Activity.title(a))}` : '🏃 Fuera del gym'}</h2>
+      ${a && (k || pace) ? `<p class="muted small">${[pace, k ? `${k.est ? '~' : ''}${k.v} kcal${k.est ? ' (estimadas)' : ''}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
+      <div class="act-types">${Object.entries(Activity.TYPES).map(([key, x]) => `<label class="act-type"><input type="radio" name="a-type" value="${key}" ${key === v.type ? 'checked' : ''}>
+        <span>${x.icon}</span><small>${x.label}</small></label>`).join('')}</div>
+      <label id="a-name-row" ${show(v.type === 'otra')}>¿Qué hiciste?<input id="a-name" value="${esc(v.name)}" placeholder="p. ej. esquí, surf, kayak…"></label>
+      <div class="rx-fields two">
+        <label>Fecha<input type="date" id="a-date" max="${ymd(Date.now())}" value="${ymd(v.start)}"></label>
+        <label>Hora<input type="time" id="a-time" value="${hhmm(v.start)}"></label>
+        <label>Duración (min)<input type="number" inputmode="numeric" id="a-mins" value="${esc(v.mins)}"></label>
+        <label id="a-km-row" ${show(t.dist)}>Distancia (km)<input type="number" inputmode="decimal" step="0.01" id="a-km" value="${esc(v.km)}" placeholder="opcional"></label></div>
+      <p class="lbl">Esfuerzo</p><div class="act-effort">${Object.entries(Activity.EFFORT).map(([key, e]) => `<label><input type="radio" name="a-effort" value="${key}" ${Number(key) === v.effort ? 'checked' : ''}>
+        <span>${e.icon} ${e.label}</span></label>`).join('')}</div>
+      <div class="rx-fields two"><label>Kcal del reloj<input type="number" inputmode="numeric" id="a-kcal" value="${esc(v.kcal)}" placeholder="opcional"></label></div>
+      <label>Notas<textarea id="a-note" rows="2" placeholder="Cómo fue, con quién, sensaciones…">${esc(v.note)}</textarea></label>
+      <button class="btn primary block" data-act="act-save" data-id="${a ? a.id : ''}">${a ? 'Guardar cambios' : 'Guardar actividad'}</button></div>
+      ${a ? `<button class="btn block ghost danger" data-act="act-del" data-id="${a.id}">Borrar esta actividad</button>` : ''}
+      <p class="muted small">Sale en tu historial y en el resumen del mes. No cuenta para la racha de entrenos ni para series y kilos.${
+        S().settings.bodyweight ? '' : ' Pon tu peso en Ajustes para estimar las kcal si no las anotas.'}</p>`;
+  }
+  function saveActivity(el) {
+    const val = id => document.getElementById(id).value, pick = n => document.querySelector(`[name="${n}"]:checked`)?.value;
+    const type = pick('a-type') || 'otra', date = val('a-date'), mins = Math.round(Number(val('a-mins')));
+    const start = new Date(`${date}T${val('a-time') || '12:00'}`).getTime();
+    if (!date || isNaN(start) || date > ymd(Date.now())) return toast('Elige una fecha que no sea futura.');
+    if (!(mins > 0)) return toast('Pon cuánto duró, en minutos.');
+    const data = { type, name: type === 'otra' ? val('a-name').trim() || undefined : undefined, start, mins, effort: Number(pick('a-effort')) || 2,
+      km: Activity.TYPES[type].dist ? Number(val('a-km')) || undefined : undefined, kcal: Number(val('a-kcal')) || undefined, note: val('a-note').trim() || undefined };
+    const old = Activity.list().find(x => x.id === el.dataset.id);
+    if (old) Object.assign(old, data); else Activity.list().push(Object.assign({ id: Store.uid() }, data));
+    save(); toast(`${Activity.TYPES[type].icon} ${old ? 'Cambios guardados' : '¡Anotado!'}`); go('#/historial');
+  }
+
   // ---------- router ----------
   const routes = [
     [/^#\/bienvenida$/, viewWelcome, '', 'GymLog'],
@@ -1509,6 +1593,8 @@
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
     [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
     [/^#\/medidas$/, viewMeasures, 'historial', 'Medidas'],
+    [/^#\/actividad\/nueva(?:\/(\w+))?$/, t => viewActivity(null, t), 'home', 'Fuera del gym'],
+    [/^#\/actividad\/(\w+)$/, id => viewActivity(id), 'historial', 'Actividad'],
     [/^#\/logros$/, viewMedals, 'home', 'Logros'],
     [/^#\/mes(?:\/(\d{4}-\d{2}))?$/, viewMonth, 'historial', 'Resumen del mes'],
   ];
@@ -1845,6 +1931,11 @@
       S().activeWorkout = null; Object.assign(Hiit, { idx: -1, running: false }); clearInterval(Hiit.int);
       save(); Timer.stop(); go('#/');
     },
+    'act-save': el => saveActivity(el),
+    'act-del': el => {
+      if (!confirm('¿Borrar esta actividad?')) return;
+      S().activities = Activity.list().filter(a => a.id !== el.dataset.id); save(); go('#/historial');
+    },
     'del-workout': el => {
       if (!confirm('¿Borrar este entreno del historial?')) return;
       S().workouts = S().workouts.filter(w => w.id !== el.dataset.id); save(); go('#/historial');
@@ -1941,7 +2032,10 @@
   document.addEventListener('change', ev => {
     const t = ev.target, d = t.dataset;
     const val = d.f === 'band' || d.wf === 'band' || d.xf === 'band' || d.xf === 'note' ? t.value : t.value === '' ? '' : Number(t.value);
-    if (d.wf) { // serie de un entreno ya guardado
+    if (t.name === 'a-type') { // distancia solo donde tiene sentido; nombre libre en «Otra»
+      document.getElementById('a-km-row').style.display = Activity.TYPES[t.value].dist ? '' : 'none';
+      document.getElementById('a-name-row').style.display = t.value === 'otra' ? '' : 'none';
+    } else if (d.wf) { // serie de un entreno ya guardado
       S().workouts.find(x => x.id === d.wid).exercises[d.ei].sets[d.si][d.wf] = val; save();
     } else if (d.wd) { // fecha, hora o duración de un entreno guardado
       const w = S().workouts.find(x => x.id === d.wid), mins = Math.round((w.end - w.start) / 60000);
