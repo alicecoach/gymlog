@@ -10,13 +10,13 @@ const Activity = (() => {
     padel: { icon: '🎾', label: 'Pádel', met: [5, 6, 7.5] },
     tenis: { icon: '🏸', label: 'Tenis / bádminton', met: [5, 7, 8] },
     equipo: { icon: '⚽', label: 'Deporte de equipo', met: [5, 7, 9] },
-    clase: { icon: '🤸', label: 'Clase dirigida', met: [5, 6.5, 8] },
+    clase: { icon: '👯', label: 'Clase dirigida', met: [5, 6.5, 8] },
     yoga: { icon: '🧘', label: 'Yoga / pilates', met: [2.5, 3, 4] },
     baile: { icon: '💃', label: 'Baile', met: [4.5, 6, 7.5] },
     escalada: { icon: '🧗', label: 'Escalada', met: [5, 7, 8] },
     otra: { icon: '✨', label: 'Otra', met: [3, 5, 7] },
   };
-  const EFFORT = { 1: { icon: '🙂', label: 'Suave' }, 2: { icon: '😅', label: 'Moderado' }, 3: { icon: '🥵', label: 'Intenso' } };
+  const EFFORT = { 1: { icon: '🍃', label: 'Suave' }, 2: { icon: '💨', label: 'Moderado' }, 3: { icon: '🌋', label: 'Intenso' } };
 
   const list = () => Store.get().activities || (Store.get().activities = []);
   const type = a => TYPES[a.type] || TYPES.otra;

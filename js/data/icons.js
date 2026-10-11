@@ -41,6 +41,50 @@ const Icons = (() => {
   const svg = pattern => `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[pattern] || P.core}</svg>`;
   const tile = (pattern, cls = '') => `<div class="pict g-${GROUP[pattern] || 'core'} ${cls}">${svg(pattern)}</div>`;
 
+  // Miniatura de ejercicio, día o entreno: mapa muscular (frente y espalda) con lo que trabaja.
+  // Principales en naranja, secundarios a media intensidad. Los polígonos van una sola vez en un <defs>.
+  const MUS = { Pecho: ['CHEST'], Dorsal: ['UPPER_BACK'], 'Espalda alta': ['TRAPEZIUS'], Hombro: ['FRONT_DELTOIDS'], 'Hombro posterior': ['BACK_DELTOIDS'],
+    'Bíceps': ['BICEPS'], 'Tríceps': ['TRICEPS'], 'Cuádriceps': ['QUADRICEPS'], Isquios: ['HAMSTRING'], 'Glúteo': ['GLUTEAL'],
+    Gemelos: ['CALVES', 'LEFT_SOLEUS', 'RIGHT_SOLEUS'], Aductores: ['ABDUCTORS', 'ABDUCTOR'], Abdomen: ['ABS', 'OBLIQUES'], Lumbar: ['LOWER_BACK'] };
+  const sprite = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  sprite.setAttribute('aria-hidden', 'true');
+  sprite.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  sprite.innerHTML = '<defs>' + ['front', 'back'].map(v => BODY_DATA[v].map(d =>
+    `<g id="b${v[0]}-${d.muscle}">${d.svgPoints.map(p => `<polygon points="${p.trim()}"/>`).join('')}</g>`).join('')).join('') + '</defs>';
+  document.body.appendChild(sprite);
+  // Altura (min y máx) de cada músculo en cada vista, para encuadrar la zona que trabaja.
+  const SPAN = {};
+  ['front', 'back'].forEach(v => BODY_DATA[v].forEach(d => {
+    const ys = d.svgPoints.join(' ').trim().split(/\s+/).filter((_, i) => i % 2).map(Number);
+    SPAN[`${v}-${d.muscle}`] = [Math.min(...ys), Math.max(...ys)];
+  }));
+  const levels = (primary, secondary) => {
+    const lvl = {};
+    secondary.forEach(m => (MUS[m] || []).forEach(k => { lvl[k] = 1; }));
+    primary.forEach(m => (MUS[m] || []).forEach(k => { lvl[k] = 2; }));
+    return lvl;
+  };
+  const view = (v, lvl) => BODY_DATA[v].map(d => `<use href="#b${v[0]}-${d.muscle}" class="m${lvl[d.muscle] || 0}"/>`).join('');
+  // Día o entreno: las dos vistas enteras.
+  function bodySvg(primary = [], secondary = []) {
+    const lvl = levels(primary, secondary);
+    return `<svg class="body" viewBox="-3 -2 216 224" aria-hidden="true">${view('front', lvl)}<g transform="translate(110 0)">${view('back', lvl)}</g></svg>`;
+  }
+  // Ejercicio: la vista donde están sus músculos principales, ampliada a esa zona.
+  function bodyZoom(primary = [], secondary = []) {
+    const lvl = levels(primary, secondary), main = Object.keys(lvl).filter(k => lvl[k] === 2);
+    const hits = v => main.filter(k => SPAN[`${v}-${k}`]).length;
+    const v = hits('back') > hits('front') ? 'back' : 'front';
+    const sp = main.map(k => SPAN[`${v}-${k}`]).filter(Boolean);
+    const H = v === 'front' ? 200 : 220, S = 116;
+    let y = sp.length ? (Math.min(...sp.map(s => s[0])) + Math.max(...sp.map(s => s[1]))) / 2 - S / 2 : 0;
+    y = Math.max(-4, Math.min(H + 4 - S, y));
+    const tall = sp.length && Math.max(...sp.map(s => s[1])) - Math.min(...sp.map(s => s[0])) > S - 8;
+    return tall ? `<svg class="body" viewBox="-60 -4 220 ${H + 8}" aria-hidden="true">${view(v, lvl)}</svg>`
+      : `<svg class="body" viewBox="-8 ${y.toFixed(1)} ${S} ${S}" aria-hidden="true">${view(v, lvl)}</svg>`;
+  }
+  const body = (primary, secondary, cls = '') => `<div class="pict body-tile ${cls}">${bodyZoom(primary, secondary)}</div>`;
+
   // Iconos para los días de rutina.
   const DAY = ['🍑', '💪', '🔥', '🦵', '⚡', '🏋️', '🎯', '🧗', '🤸', '🔋', '🫀', '⭐'];
   function dayIconFor(name = '') {
@@ -54,7 +98,7 @@ const Icons = (() => {
     return '🏋️';
   }
 
-  // Emojis de interfaz → iconos de línea (Lucide o un pictograma propio "p:"). Los de contenido
+  // Emojis de interfaz → iconos de línea (Lucide). Los de contenido
   // (avatares, medallas, deportes, ánimo, ciclo) no están aquí y se quedan como emoji.
   const UI = {
     '🏠': 'house', '🏋️': 'dumbbell', '📋': 'clipboard-list', '🔎': 'search', '📈': 'trending-up', '⚙️': 'settings',
@@ -66,13 +110,14 @@ const Icons = (() => {
     '📲': 'smartphone', '🔥': 'flame', '⚡': 'zap', '💪': 'biceps-flexed', '🍽️': 'utensils', '🏆': 'trophy',
     '🐾': 'paw-print', '🧗': 'mountain', '🫀': 'heart-pulse', '⭐': 'star', '🎉': 'party-popper', '🏅': 'medal',
     '⏭': 'skip-forward', '▶': 'play', '🌱': 'sprout', '🌡️': 'thermometer',
-    '🍑': 'p:hinge', '🦵': 'p:squat', '🤸': 'p:power', '🧘': 'p:mobility',
+    '🦵': 'footprints', '🤸': 'rocket', '🧘': 'wind',
+    '🏃': 'footprints', '🥾': 'mountain', '🚴': 'bike', '🏊': 'waves', '🎾': 'volleyball', '🏸': 'volleyball', '⚽': 'goal',
+    '👯': 'users', '💃': 'music', '🍃': 'signal-low', '💨': 'signal-medium', '🌋': 'signal-high',
+    '😴': 'battery-low', '😐': 'battery-medium', '🙂': 'battery-full', '🤩': 'zap',
   };
   const TINT = { flame: 'hot', sparkles: 'hot', 'triangle-alert': 'warn', lightbulb: 'warn', trophy: 'warn', medal: 'warn',
     ban: 'bad', 'circle-check': 'ok', 'trending-up': 'ok', 'arrow-up': 'ok', sprout: 'ok' };
-  const uiSvg = name => name.startsWith('p:')
-    ? `<svg class="ei pg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name.slice(2)]}</svg>`
-    : `<svg class="ei${TINT[name] ? ' t-' + TINT[name] : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`;
+  const uiSvg = name => `<svg class="ei${TINT[name] ? ' t-' + TINT[name] : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`;
   const base = s => s.replace(/️/g, '');
   const KEYS = Object.keys(UI).map(base).sort((a, b) => b.length - a.length);
   const UIB = Object.fromEntries(Object.entries(UI).map(([k, v]) => [base(k), v]));
@@ -94,5 +139,5 @@ const Icons = (() => {
     });
   }
 
-  return { svg, tile, P, GROUP, DAY, dayIconFor, upgrade };
+  return { svg, tile, P, GROUP, DAY, dayIconFor, upgrade, body, bodySvg };
 })();

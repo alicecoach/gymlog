@@ -28,6 +28,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 9, date: '2026-10-11', items: [
+      '🎯 <b>Nuevo diseño</b>: cada ejercicio muestra un mapa muscular con lo que trabaja (en naranja los principales). Los días de tu rutina y tus entrenos, igual: de un vistazo ves qué músculos tocan.',
+      '✨ Iconos de línea en toda la app, también en deportes y en la energía al terminar, y una sola paleta de colores.',
+    ] },
     { v: 8, date: '2026-10-09', items: [
       '🔥 <b>Calentamiento</b> antes de entrenar (~6 min): cardio suave y movilidad de lo que vas a trabajar hoy. Con modo guiado: la app te cronometra cada paso.',
       '🧘 <b>Estiramientos</b> al terminar (~5 min), suaves y adaptados a si has hecho tren superior, inferior o completo. Si no te apetece, «Hoy no» y listo. Se quita en ⚙️ Ajustes.',
@@ -163,9 +167,16 @@
   }
   function thumb(exId, cls = '') {
     const p = S().photos[exId];
-    return p ? `<div class="pict photo ${cls}"><img src="${p}" alt=""></div>` : Icons.tile(Store.exercise(exId).pattern, cls);
+    return p ? `<div class="pict photo ${cls}"><img src="${p}" alt=""></div>` : Icons.body(Store.exercise(exId).primary, Store.exercise(exId).secondary, cls);
   }
-  const workoutIcon = w => w.icon || routineById(w.routineId)?.days[w.dayIndex]?.icon || '🏋️';
+  // Mapa muscular de un día o un entreno: músculos principales en naranja, secundarios suaves.
+  function musclesOf(exIds) {
+    const p = new Set(), s = new Set();
+    exIds.forEach(id => { const ex = Store.exercise(id); ex.primary.forEach(m => p.add(m)); ex.secondary.forEach(m => s.add(m)); });
+    return [[...p], [...s].filter(m => !p.has(m))];
+  }
+  const dayBody = d => Icons.bodySvg(...musclesOf(d.exercises.map(x => x.exId)));
+  const workoutIcon = w => Icons.bodySvg(...musclesOf(w.exercises.map(e => e.exId)));
 
   function toast(msg) {
     const t = document.getElementById('toast');
@@ -286,7 +297,7 @@
       h += `<div class="section-head"><h2>${esc(r.name)}</h2><a class="link" href="#/rutina/${r.id}">Editar</a></div>`;
       r.days.forEach((d, i) => {
         const last = lastDone(r, i);
-        h += `<div class="card day ${i === next ? 'next' : ''}"><div class="day-ic">${d.icon || '🏋️'}</div>
+        h += `<div class="card day ${i === next ? 'next' : ''}"><div class="day-ic">${dayBody(d)}</div>
           <div class="grow"><b>${esc(d.name)}</b><small>${d.exercises.length} ejercicios · ${last ? agoTxt(last) : 'sin hacer aún'}${i === next ? ` · <span class="hl">${nextTxt}</span>` : ''}</small></div>
           <button class="play ${i === next ? 'on' : ''}" data-act="start" data-day="${i}" aria-label="Empezar ${esc(d.name)}">▶</button></div>`;
       });
@@ -568,7 +579,7 @@
     acts.forEach(x => { const k = x.type === 'otra' ? 'otra:' + Activity.title(x) : x.type; (by[k] = by[k] || []).push(x); });
     const mins = list => list.reduce((s, x) => s + (Number(x.mins) || 0), 0), km = list => list.reduce((s, x) => s + (Number(x.km) || 0), 0);
     return `<div class="card"><h3>🏃 Fuera del gym · ${acts.length}</h3>${Object.values(by).sort((x, y) => mins(y) - mins(x)).map(list => `<div class="hist-row">
-      <span class="grow"><span class="emo">${Activity.type(list[0]).icon}</span> ${esc(Activity.title(list[0]))}${list.length > 1 ? ` <small class="muted">× ${list.length}</small>` : ''}</span>
+      <span class="grow"><span>${Activity.type(list[0]).icon}</span> ${esc(Activity.title(list[0]))}${list.length > 1 ? ` <small class="muted">× ${list.length}</small>` : ''}</span>
       <span><b>${fmtDur(mins(list) * 60000)}</b>${km(list) ? ` <small class="muted">${fmtNum(km(list))} km</small>` : ''}</span></div>`).join('')}
       <p class="muted small">${fmtDur(mins(acts) * 60000)} en total.</p></div>`;
   }
@@ -669,7 +680,7 @@
     const c = S().cycle;
     if (c.hormonal || c.irregular) return '';
     const pat = Cycle.pattern();
-    if (!pat.ready) return `<div class="card"><h3>📊 Tu patrón</h3><p class="muted small">Valora cómo te has sentido al terminar cada entreno (😴 😐 🙂 💪).
+    if (!pat.ready) return `<div class="card"><h3>📊 Tu patrón</h3><p class="muted small">Valora cómo te has sentido al terminar cada entreno (😴 😐 🙂 🤩).
       Con 2 ciclos anotados verás tu energía y tus récords en cada fase: <b>tus datos, no un promedio</b>.</p>
       <p class="small">Llevas ${pat.rated} ${pat.rated === 1 ? 'entreno valorado' : 'entrenos valorados'} · ${Math.max(0, Cycle.starts().length - 1)} de 2 ciclos completos.</p></div>`;
     return `<div class="card"><h3>📊 Tu patrón</h3><p class="muted small">Energía media y récords en cada fase, con tus entrenos valorados.</p>
@@ -729,7 +740,7 @@
     s.routines.forEach(r => {
       const active = r.id === s.activeRoutineId;
       h += `<div class="card ${active ? 'active-r' : ''}"><div class="row between"><b>${esc(r.name)}</b>${active ? '<span class="tag">Activa</span>' : ''}</div>
-        <div class="day-strip">${r.days.map(d => `<span title="${esc(d.name)}">${d.icon || '🏋️'}</span>`).join('')}</div>
+        <div class="day-strip">${r.days.map(d => `<span title="${esc(d.name)}">${dayBody(d)}</span>`).join('')}</div>
         <div class="row gap"><a class="btn small" href="#/rutina/${r.id}">Editar</a>
         ${active ? '' : `<button class="btn small" data-act="activate" data-id="${r.id}">Activar</button>`}
         <button class="btn small ghost" data-act="dup-routine" data-id="${r.id}">Duplicar</button>
@@ -748,8 +759,7 @@
       ${active ? '<span class="tag">Rutina activa</span>' : `<button class="btn small" data-act="activate" data-id="${r.id}">Activar</button>`}</div>`;
     r.days.forEach((d, di) => {
       h += `<section class="card"><div class="row between">
-        <details class="icon-pick"><summary class="day-ic" title="Cambiar icono">${d.icon || '🏋️'}</summary>
-          <div class="icon-grid">${Icons.DAY.map(i => `<button data-act="set-icon" data-rid="${r.id}" data-di="${di}" data-icon="${i}">${i}</button>`).join('')}</div></details>
+        <div class="day-ic">${dayBody(d)}</div>
         <input class="day-name grow" data-df="name" data-rid="${r.id}" data-di="${di}" value="${esc(d.name)}">
         <button class="icon" data-act="del-day" data-rid="${r.id}" data-di="${di}" title="Borrar día">🗑</button></div>`;
       d.exercises.forEach((x, xi) => {
@@ -948,7 +958,7 @@
     const lastTarget = hist[0]?.target || Generator.targetFor(ex, S().profile?.goal, S().profile?.level);
     const sg = Progression.suggest(id, lastTarget);
     const best = hist.length ? Math.max(...hist.map(h => Progression.bestE1rm(h.sets))) : 0;
-    let h = `<div class="card ex-detail">${photo ? `<div class="photo-big"><img src="${photo}" alt=""></div>` : Icons.tile(ex.pattern, 'xl')}
+    let h = `<div class="card ex-detail">${photo ? `<div class="photo-big"><img src="${photo}" alt=""></div>` : Icons.body(ex.primary, ex.secondary, 'xl')}
       <h2>${esc(ex.name)}</h2><p class="muted">${esc(ex.brand)}${ex.line ? ' · ' + esc(ex.line) : ''} · ${LOAD_TYPES[ex.load] || ''}${ex.unilateral ? ' · unilateral' : ''}</p>
       ${excluded().includes(id) ? '<p class="tag bad">Evitar: incompatible con tus restricciones</p>' : ''}
       <p><b>Patrón:</b> ${PATTERNS[ex.pattern]}<br><b>Principales:</b> ${esc(ex.primary.join(', '))}${ex.secondary.length ? `<br><b>Secundarios:</b> ${esc(ex.secondary.join(', '))}` : ''}</p>
@@ -1075,7 +1085,7 @@
       if (!r) return `<div class="card"><p>No tienes una rutina activa.</p><a class="btn primary" href="#/generar">Crear rutina</a></div>`;
       const next = nextDayIndex(r);
       return `<h2>¿Qué toca hoy?</h2>${r.days.map((d, i) => `<button class="card day btn-card ${i === next ? 'next' : ''}" data-act="start" data-day="${i}">
-        <div class="day-ic">${d.icon || '🏋️'}</div><div class="grow"><b>${esc(d.name)}</b><small>${lastDone(r, i) ? agoTxt(lastDone(r, i)) : 'sin hacer aún'}${i === next ? ' · <span class="hl">siguiente</span>' : ''}</small></div><span class="chev">›</span></button>`).join('')}
+        <div class="day-ic">${dayBody(d)}</div><div class="grow"><b>${esc(d.name)}</b><small>${lastDone(r, i) ? agoTxt(lastDone(r, i)) : 'sin hacer aún'}${i === next ? ' · <span class="hl">siguiente</span>' : ''}</small></div><span class="chev">›</span></button>`).join('')}
         <div class="section-head"><h2>O algo distinto</h2></div><div class="quick">` +
         Object.entries(Quick.TYPES).map(([k, t]) => `<button class="qcard g-${t.grad}" data-act="quick" data-type="${k}"><span class="qi">${t.icon}</span><b>${t.label}</b><small>${t.desc}</small></button>`).join('') + '</div>';
     }
@@ -1092,7 +1102,7 @@
     w.exercises.forEach((e, ei) => { h += exerciseCard(e, ei); });
     const hasCore = w.exercises.some(e => Store.exercise(e.exId).pattern === 'core');
     if (!hasCore && !w.coreAsked && ['rutina', 'fullbody', 'pierna', 'torso'].includes(w.type || 'rutina')) {
-      h += `<div class="card core-offer"><div class="pict g-core sm">${Icons.svg('core')}</div><div class="grow"><b>¿Cierras con core?</b>
+      h += `<div class="card core-offer">${Icons.body(['Abdomen'], [], 'sm')}<div class="grow"><b>¿Cierras con core?</b>
         <small>3 ejercicios · ~6 min</small></div>
         <div class="row gap"><button class="btn small primary" data-act="add-core">Añadir</button><button class="btn small ghost" data-act="skip-core">Hoy no</button></div></div>`;
     }
@@ -1404,7 +1414,7 @@
       <label>Hora<input type="time" id="p-time" value="18:00"></label>
       <label>Duración (min)<input type="number" inputmode="numeric" id="p-mins" value="45"></label></div></div>
       <div class="section-head"><h2>¿Qué hiciste?</h2></div>
-      ${r ? r.days.map((d, i) => `<button class="card day btn-card" data-act="start-past" data-day="${i}"><div class="day-ic">${d.icon || '🏋️'}</div>
+      ${r ? r.days.map((d, i) => `<button class="card day btn-card" data-act="start-past" data-day="${i}"><div class="day-ic">${dayBody(d)}</div>
         <div class="grow"><b>${esc(d.name)}</b><small>${esc(r.name)} · ${d.exercises.length} ejercicios</small></div><span class="chev">›</span></button>`).join('') : ''}
       <button class="card day btn-card" data-act="start-past"><div class="day-ic">📝</div><div class="grow"><b>Entreno libre</b>
         <small>Eliges tú los ejercicios</small></div><span class="chev">›</span></button>`;
@@ -1515,7 +1525,7 @@
       <div class="row gap"><button class="btn" data-act="export">Exportar</button>
       <label class="btn file-btn">Importar<input type="file" accept="application/json,.json" id="import" hidden></label></div></div>
       <div class="card"><button class="btn ghost danger" data-act="reset">Borrar los datos de ${esc(u.name)}</button></div>
-      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Pictogramas propios. Iconos: <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC). Ilustraciones de técnica: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (CC BY-SA 4.0).</p>`;
+      <p class="muted small">Hammer Strength y Matrix son marcas de sus respectivos propietarios; esta app no está afiliada a ellas. Mapa muscular: <a href="https://github.com/giavinh79/react-body-highlighter" target="_blank" rel="noopener">react-body-highlighter</a> (MIT). Iconos: <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC). Ilustraciones de técnica: <a href="https://github.com/everkinetic/data" target="_blank" rel="noopener">Everkinetic</a> (CC BY-SA 4.0).</p>`;
   }
 
   // ---------- usuarios ----------
@@ -1533,7 +1543,7 @@
       <div class="section-head"><h2>¿Cómo quieres empezar?</h2></div>
       <button class="card day btn-card" data-act="onboard" data-mode="generar"><div class="day-ic">✨</div><div class="grow"><b>Generar una rutina</b>
         <small>Según tu objetivo, días y material</small></div><span class="chev">›</span></button>
-      ${PRESETS.map(p => `<button class="card day btn-card" data-act="onboard" data-mode="preset" data-key="${p.key}"><div class="day-ic">${p.days[0].icon}</div>
+      ${PRESETS.map(p => `<button class="card day btn-card" data-act="onboard" data-mode="preset" data-key="${p.key}"><div class="day-ic">${dayBody(p.days[0])}</div>
         <div class="grow"><b>Cargar ${esc(p.name)}</b><small>Rutina predefinida · ${p.days.length} días</small></div><span class="chev">›</span></button>`).join('')}
       <label class="card day btn-card file-btn"><div class="day-ic">📥</div><div class="grow"><b>Importar mi rutina</b>
         <small>Desde un archivo .json (te lo puedes enviar por WhatsApp o email)</small></div><span class="chev">›</span>
@@ -1562,11 +1572,11 @@
     const wk = Activity.between(weekStart(Date.now()), Infinity), mins = wk.reduce((s, a) => s + (Number(a.mins) || 0), 0);
     return `<div class="section-head"><h2>Fuera del gym</h2><small>${wk.length ? `esta semana: ${wk.length} · ${fmtDur(mins * 60000)}` : 'correr, pádel, bici…'}</small></div>
       <div class="act-chips">${['correr', 'padel', 'caminar', 'bici', 'nadar', 'yoga', 'otra'].map(k => `<a class="act-chip" href="#/actividad/nueva/${k}">
-        <span class="emo">${Activity.TYPES[k].icon}</span>${k === 'otra' ? 'Otra…' : Activity.TYPES[k].label.split(' /')[0]}</a>`).join('')}</div>`;
+        <span>${Activity.TYPES[k].icon}</span>${k === 'otra' ? 'Otra…' : Activity.TYPES[k].label.split(' /')[0]}</a>`).join('')}</div>`;
   }
   function activityItem(a) {
     const k = Activity.kcal(a);
-    return `<a class="list-item act-item" href="#/actividad/${a.id}"><div class="day-ic sm emo">${Activity.type(a).icon}</div><div class="grow"><b>${esc(Activity.title(a))}</b>
+    return `<a class="list-item act-item" href="#/actividad/${a.id}"><div class="day-ic sm">${Activity.type(a).icon}</div><div class="grow"><b>${esc(Activity.title(a))}</b>
       <small>${fmtDate(a.start)} · ${actMeta(a)}${k ? ` · ${k.est ? '~' : ''}${k.v} kcal` : ''}</small></div><span class="chev">›</span></a>`;
   }
   function viewActivity(id, preset) {
@@ -1575,10 +1585,10 @@
     const v = a || { type: Activity.TYPES[preset] ? preset : 'correr', start: Date.now(), mins: 60, effort: 2 };
     const t = Activity.type(v), show = c => c ? '' : 'style="display:none"';
     const k = a && Activity.kcal(a), pace = a && Activity.pace(a);
-    return `<div class="card act-form"><h2>${a ? `<span class="emo">${t.icon}</span> ${esc(Activity.title(a))}` : '🏃 Fuera del gym'}</h2>
+    return `<div class="card act-form"><h2>${a ? `${t.icon} ${esc(Activity.title(a))}` : '🏃 Fuera del gym'}</h2>
       ${a && (k || pace) ? `<p class="muted small">${[pace, k ? `${k.est ? '~' : ''}${k.v} kcal${k.est ? ' (estimadas)' : ''}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
       <div class="act-types">${Object.entries(Activity.TYPES).map(([key, x]) => `<label class="act-type"><input type="radio" name="a-type" value="${key}" ${key === v.type ? 'checked' : ''}>
-        <span class="emo">${x.icon}</span><small>${x.label}</small></label>`).join('')}</div>
+        <span>${x.icon}</span><small>${x.label}</small></label>`).join('')}</div>
       <label id="a-name-row" ${show(v.type === 'otra')}>¿Qué hiciste?<input id="a-name" value="${esc(v.name)}" placeholder="p. ej. esquí, surf, kayak…"></label>
       <div class="rx-fields two">
         <label>Fecha<input type="date" id="a-date" max="${ymd(Date.now())}" value="${ymd(v.start)}"></label>
@@ -1853,7 +1863,6 @@
       if (S().activeRoutineId === el.dataset.id) S().activeRoutineId = S().routines[0]?.id || null;
       save(); render(true);
     },
-    'set-icon': el => { routineOf(el).days[el.dataset.di].icon = el.dataset.icon; save(); render(true); },
     'add-day': el => { const r = routineOf(el); r.days.push({ name: `Día ${r.days.length + 1}`, icon: '🏋️', exercises: [] }); save(); render(true); },
     'del-day': el => {
       const r = routineOf(el);

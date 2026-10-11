@@ -173,12 +173,6 @@ legend { color: var(--muted); font-size: .85rem; padding: 0 6px; }
 .active-r { border-color: rgba(255, 106, 43, .4); }
 .day-strip { display: flex; gap: 6px; margin: 8px 0 2px; font-size: 1.4rem; }
 .day-name { font-weight: 800; font-size: 1.02rem; margin: 0 8px; }
-.icon-pick { position: relative; }
-.icon-pick summary { list-style: none; cursor: pointer; }
-.icon-pick summary::-webkit-details-marker { display: none; }
-.icon-grid { position: absolute; z-index: 4; top: 54px; left: 0; display: grid; grid-template-columns: repeat(6, 40px); gap: 4px; padding: 8px; background: var(--card2); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 30px rgba(0, 0, 0, .5); animation: pop .2s var(--ease); }
-.icon-grid button { width: 40px; height: 40px; font-size: 1.3rem; border: 0; background: transparent; border-radius: 10px; cursor: pointer; }
-.icon-grid button:active { background: var(--card); }
 .rx { border-top: 1px solid var(--line); padding: 12px 0; }
 .rx-head { display: flex; align-items: center; gap: 12px; }
 .rx-head small { display: block; }
@@ -633,3 +627,29 @@ body.no-user .tabbar, body.no-user .top-actions { display: none; }
 .prep-done { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .85rem; margin: 0 4px 12px; }
 .prep-chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 4px 0 10px; }
 .prep-chips span { background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: .78rem; }
+
+/* ---------- mapa muscular (miniaturas de ejercicios, días y entrenos) ---------- */
+.pict.body-tile { background: linear-gradient(160deg, #1f2431, #161a23); border: 1px solid var(--line); }
+.pict.body-tile svg { width: 86%; height: 86%; filter: none; }
+svg.body .m0 { fill: #343a4a; }
+svg.body .m1 { fill: #a8572c; }
+svg.body .m2 { fill: var(--accent); }
+.day-ic svg.body { width: 84%; height: 84%; }
+.card.day.next .day-ic { background: linear-gradient(160deg, #2a2230, #1d1a22); border: 1px solid rgba(255, 106, 43, .55); }
+.day-strip span { width: 30px; height: 30px; border-radius: 9px; background: var(--card2); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
+.day-strip svg.body { width: 86%; height: 86%; }
+
+/* Una sola paleta de marca: tarjetas oscuras e iconos en naranja. */
+.qcard, .qcard.g-push, .qcard.g-pull, .qcard.g-legs, .qcard.g-glute, .qcard.g-core, .qcard.g-power {
+  background: linear-gradient(160deg, #222734, #171a22); border: 1px solid var(--line); color: var(--text);
+}
+.qcard::after { background: radial-gradient(140px 90px at 85% 0%, rgba(255, 106, 43, .16), transparent 70%); }
+.qcard .qi { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  background: rgba(255, 106, 43, .14); color: var(--accent2); margin-bottom: auto; }
+.qcard .qi .ei { color: var(--accent2); }
+.qcard small { color: var(--muted); }
+.prep-ic, .prep.cool .prep-ic { background: rgba(255, 106, 43, .14); color: var(--accent2); }
+.prep-ic .ei { color: var(--accent2); }
+.card.prep.cool { border-color: rgba(255, 106, 43, .25); }
+.sheet-ic { background: rgba(255, 106, 43, .14); color: var(--accent2); }
+.act-chip .ei, .act-type .ei, .act-item .day-ic .ei { color: var(--accent2); }
