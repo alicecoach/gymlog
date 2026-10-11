@@ -28,6 +28,9 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 10, date: '2026-10-11', items: [
+      '✨ <b>Nuevo color</b>: GymLog se viste de verde lima, más limpio y con más energía. Los avisos van ahora en ámbar para que no se confundan.',
+    ] },
     { v: 9, date: '2026-10-11', items: [
       '🎯 <b>Nuevo diseño</b>: cada ejercicio muestra un mapa muscular con lo que trabaja (en naranja los principales). Los días de tu rutina y tus entrenos, igual: de un vistazo ves qué músculos tocan.',
       '✨ Iconos de línea en toda la app, también en deportes y en la energía al terminar, y una sola paleta de colores.',
@@ -477,7 +480,7 @@
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const c = document.createElement('canvas'), x = c.getContext('2d'), W = c.width = innerWidth, H = c.height = innerHeight;
     c.className = 'confetti'; document.body.appendChild(c);
-    const cols = ['#ff6a2b', '#ff9a3d', '#34d399', '#5b8cff', '#fbbf24', '#ff6fae', '#a77bff'];
+    const cols = ['#c6f432', '#d8ff63', '#34d399', '#5b8cff', '#ffa94d', '#ff6fae', '#a77bff'];
     const ps = Array.from({ length: n }, () => ({ x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35, vx: (Math.random() - .5) * 14, vy: -Math.random() * 14 - 4,
       r: Math.random() * Math.PI, vr: (Math.random() - .5) * .4, w: 6 + Math.random() * 6, h: 4 + Math.random() * 4, c: cols[Math.random() * cols.length | 0] }));
     const t0 = performance.now();
