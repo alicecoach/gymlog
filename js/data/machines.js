@@ -60,7 +60,7 @@ const MACHINES = (() => {
   const add = (brand, line, id, name, pattern, load, primary, secondary = [], opts = {}) =>
     list.push({ id, name, brand, line, pattern, load, primary, secondary,
       compound: opts.compound ?? ['press_horizontal', 'press_incline', 'press_vertical', 'pull_vertical', 'row', 'squat', 'hinge'].includes(pattern),
-      unilateral: !!opts.unilateral });
+      unilateral: !!opts.unilateral, like: opts.like || [] });
 
   // ---------- Hammer Strength · Plate-Loaded ----------
   const HP = (...a) => add('Hammer Strength', 'Plate-Loaded', ...a);
@@ -82,6 +82,8 @@ const MACHINES = (() => {
   HP('hs-squat-lunge', 'Squat Lunge', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores']);
   HP('hs-iso-leg-ext', 'Iso-Lateral Leg Extension', 'knee_ext', 'plates', ['Cuádriceps'], [], { unilateral: true });
   HP('hs-kneeling-curl', 'Iso-Lateral Kneeling Leg Curl', 'knee_flex', 'plates', ['Isquios'], [], { unilateral: true });
+  HP('hs-iso-leg-curl', 'Iso-Lateral Leg Curl (tumbado)', 'knee_flex', 'plates', ['Isquios'], [], { unilateral: true, like: ['g-prone-curl', 'hss-prone-curl', 'mu-prone-curl'] });
+  HP('hs-multisquat-rdl', 'MultiSquat · Peso muerto rumano', 'hinge', 'plates', ['Isquios', 'Glúteo'], ['Lumbar'], { like: ['g-rdl', 'g-db-rdl'] });
   HP('hs-seated-calf', 'Seated Calf Raise', 'calf', 'plates', ['Gemelos']);
 
   // ---------- Hammer Strength · Select (placas) ----------

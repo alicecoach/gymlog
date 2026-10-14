@@ -14,6 +14,7 @@
   let holdOn = null;   // serie por tiempo con la cuenta atrás en marcha ("ei-si")
   let memoOpen = null; // ejercicio del entreno con el panel de molestias/anotación abierto
   let demoOpen = null; // ejercicio del entreno con la ilustración de técnica abierta
+  let orderOpen = false; // entreno en modo «cambiar el orden»
   let celebrate = null; // id del entreno recién terminado, para lanzar el confeti una sola vez
 
   const TIPS = [
@@ -28,6 +29,11 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 11, date: '2026-10-14', items: [
+      '⇅ <b>Cambia el orden</b> del entreno de hoy: toca ⇅ arriba, junto a «Terminar», y sube o baja ejercicios. Tu rutina no cambia y las superseries se mueven juntas.',
+      '🏋️ <b>Nuevas máquinas Hammer Strength</b>: MultiSquat para peso muerto rumano e Iso-Lateral Leg Curl (tumbado). Salen las primeras en ⇄ cuando tu máquina está ocupada.',
+      '✨ ¿Te saltaste lo de crear rutina al empezar? Está en <b>Rutinas → Generar rutina</b>.',
+    ] },
     { v: 10, date: '2026-10-11', items: [
       '✨ <b>Nuevo color</b>: GymLog se viste de verde lima, más limpio y con más energía. Los avisos van ahora en ámbar para que no se confundan.',
     ] },
@@ -97,6 +103,8 @@
     ['📈', 'Sigue la sugerencia', 'Doble progresión: cuando llegas al tope de reps en todas las series, toca subir peso. Si te estancas, te avisa.'],
     ['🎯', 'Anota el RIR', 'Las reps que te quedaban en la recámara. Con él las sugerencias se ajustan mejor a ti.'],
     ['⇄', '¿Máquina ocupada?', 'Toca ⇄ en el ejercicio: alternativas que trabajan lo mismo, solo para hoy.'],
+    ['⇅', 'Otro orden hoy', 'Toca ⇅ junto a «Terminar» para subir o bajar ejercicios del entreno. Solo para hoy: la rutina no cambia.'],
+    ['✨', 'Generar una rutina', 'En Rutinas → «Generar rutina», según tu objetivo, días y máquinas. Puedes generar otra cuando quieras.'],
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
     ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
     ['📖', 'Cómo se hace', 'Toca «📖 Cómo se hace» en el entreno o abre la ficha del ejercicio: los pasos de la técnica y, en muchos, una ilustración animada.'],
@@ -1095,7 +1103,9 @@
     if (w.type === 'hiit') return viewHiit(w);
     let h = `<div class="workout-head"><div class="day-ic">${workoutIcon(w)}</div><div class="grow"><h2>${esc(w.dayName)}</h2>
       <small>${w.past ? `📅 ${fmtDate(w.start)} · ${w.past} min` : `⏱ <span id="elapsed">${fmtDur(Date.now() - w.start)}</span>`}</small></div>
+      ${w.exercises.length > 1 ? `<button class="icon order-btn ${orderOpen ? 'on' : ''}" data-act="order-open" title="Cambiar el orden">⇅</button>` : ''}
       <button class="btn primary" data-act="finish">${w.past ? 'Guardar' : 'Terminar'}</button></div><div id="msg"></div>`;
+    if (orderOpen) return h + orderPanel(w);
     if (w.past) h += `<div class="card past-note">📅 Estás anotando un entreno pasado: rellena lo que hiciste y marca ✓ cada serie. Sin descansos ni cronómetro.</div>`;
     const notes = routineById(w.routineId)?.notes;
     if (notes) h += `<details class="card notes"><summary>📝 Notas de la rutina</summary><p>${esc(notes).replace(/\n/g, '<br>')}</p></details>`;
@@ -1113,6 +1123,26 @@
     h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a>
       <button class="btn block ghost danger" data-act="discard">Descartar entreno</button>`;
     return h;
+  }
+
+  // Bloques del entreno: un ejercicio suelto o una superserie entera (se mueven juntos).
+  function workoutBlocks(list) {
+    const out = [];
+    for (let i = 0; i < list.length; i++) { const b = [i]; while (list[i].superset && i + 1 < list.length) b.push(++i); out.push(b); }
+    return out;
+  }
+
+  // Modo ordenar: lista compacta con ↑ ↓ para hacer hoy los ejercicios en otro orden (la rutina no cambia).
+  function orderPanel(w) {
+    const blocks = workoutBlocks(w.exercises);
+    const row = i => { const e = w.exercises[i], done = e.sets.filter(s => s.done).length;
+      return `<div class="order-ex">${thumb(e.exId, 'sm')}<div class="grow"><b>${esc(Store.exercise(e.exId).name)}</b>
+        <small>${done ? `✓ ${done}/${e.sets.length}` : `${e.sets.length}`} series</small></div></div>`; };
+    return `<div class="card order-panel"><h3>Cambiar el orden</h3><p class="muted small">Solo para hoy: tu rutina no cambia. Las superseries se mueven juntas.</p>
+      ${blocks.map((b, bi) => `<div class="order-row ${b.length > 1 ? 'linked' : ''}"><div class="grow">${b.map(row).join('')}</div>
+        <div class="order-btns"><button class="icon" data-act="order-mv" data-bi="${bi}" data-dir="-1" ${bi ? '' : 'disabled'} aria-label="Subir">↑</button>
+        <button class="icon" data-act="order-mv" data-bi="${bi}" data-dir="1" ${bi < blocks.length - 1 ? '' : 'disabled'} aria-label="Bajar">↓</button></div></div>`).join('')}
+      <button class="btn primary block" data-act="order-open">Listo</button></div>`;
   }
 
   function swapPanel(e, ei) {
@@ -1684,7 +1714,7 @@
       requestAnimationFrame(step);
     });
   }
-  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; render(false); });
+  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; orderOpen = false; render(false); });
 
   // Pantalla encendida mientras hay un entreno en curso (no en los de días pasados).
   let wakeLock = null, wakeBusy = false;
@@ -1932,6 +1962,14 @@
       sets.push(s); save(); render(true);
     },
     'del-set': el => { const sets = S().activeWorkout.exercises[el.dataset.ei].sets; if (sets.length > 1) sets.pop(); save(); render(true); },
+    'order-open': () => { orderOpen = !orderOpen; swapOpen = null; memoOpen = null; demoOpen = null; render(true); },
+    'order-mv': el => {
+      const w = S().activeWorkout, blocks = workoutBlocks(w.exercises), i = Number(el.dataset.bi), j = i + Number(el.dataset.dir);
+      if (j < 0 || j >= blocks.length) return;
+      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+      w.exercises = blocks.flat().map(k => w.exercises[k]);
+      save(); render(true);
+    },
     'swap-open': el => { const i = Number(el.dataset.ei); swapOpen = swapOpen === i ? null : i; memoOpen = null; render(true); },
     'memo-open': el => { const i = Number(el.dataset.ei); memoOpen = memoOpen === i ? null : i; swapOpen = null; render(true); },
     'demo-open': el => { const i = Number(el.dataset.ei); demoOpen = demoOpen === i ? null : i; render(true); },

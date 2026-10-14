@@ -102,7 +102,7 @@ const Icons = (() => {
   // (avatares, medallas, deportes, ánimo, ciclo) no están aquí y se quedan como emoji.
   const UI = {
     '🏠': 'house', '🏋️': 'dumbbell', '📋': 'clipboard-list', '🔎': 'search', '📈': 'trending-up', '⚙️': 'settings',
-    '📝': 'notebook-pen', '⇄': 'arrow-left-right', '📖': 'book-open', '🎬': 'book-open', '⚠️': 'triangle-alert',
+    '📝': 'notebook-pen', '⇄': 'arrow-left-right', '⇅': 'arrow-up-down', '📖': 'book-open', '🎬': 'book-open', '⚠️': 'triangle-alert',
     '⬆️': 'arrow-up', '➡️': 'arrow-right', '⬇️': 'arrow-down', '🆕': 'sparkles', '🔋': 'battery-charging',
     '📅': 'calendar', '🗓️': 'calendar-days', '📆': 'calendar-range', '📏': 'ruler', '💡': 'lightbulb', '✨': 'sparkles',
     '💾': 'save', '📥': 'download', '📊': 'chart-column', '🔗': 'link', '✏️': 'pencil', '🗑': 'trash-2', '⏱': 'timer',

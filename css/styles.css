@@ -659,3 +659,14 @@ svg.body .m2 { fill: var(--accent); }
 .btn.primary, .play.on { background: var(--accent); color: var(--on-accent); }
 .tag, .chip.on, .hold-btn.on, .cal-d.on, .memo-btn.open { color: var(--on-accent); }
 .memo-btn.open .ei { color: var(--on-accent); }
+
+/* Entreno: cambiar el orden de los ejercicios */
+.order-btn { flex: none; border: 1px solid var(--line); }
+.order-btn.on { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.order-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.order-row.linked > .grow { border-left: 3px solid rgba(198, 244, 50, .5); padding-left: 8px; }
+.order-ex { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+.order-ex small { display: block; color: var(--muted); }
+.order-btns { display: flex; flex-direction: column; }
+.order-btns .icon:disabled { opacity: .25; cursor: default; }
+.order-panel .btn.block { margin-top: 12px; }

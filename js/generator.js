@@ -78,7 +78,9 @@ const Generator = (() => {
     const brands = Store.get().profile?.brands || BRANDS;
     const excluded = Store.get().profile?.excluded || [];
     const familiar = new Set(Store.get().routines.flatMap(r => r.days.flatMap(d => d.exercises.map(x => x.exId))));
-    const score = e => e.primary.filter(m => ex.primary.includes(m)).length * 2
+    // Variantes casi idénticas (misma máquina en otra marca, misma técnica) van primero.
+    const twin = e => (ex.like || []).includes(e.id) || (e.like || []).includes(ex.id);
+    const score = e => e.primary.filter(m => ex.primary.includes(m)).length * 2 + (twin(e) ? 4 : 0)
       + (Progression.historyFor(e.id).length ? 3 : 0) + (familiar.has(e.id) ? 2 : 0) + (e.custom ? 1 : 0);
     return Store.allExercises()
       .filter(e => e.id !== exId && !avoid.includes(e.id) && e.pattern === ex.pattern && !excluded.includes(e.id) && (e.custom || brands.includes(e.brand)))
