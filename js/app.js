@@ -29,6 +29,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 14, date: '2026-10-15', items: [
+      '📊 <b>Informe de fin de bloque</b> (en Historial): ejercicio a ejercicio, qué sube, qué se ha estancado y cuál conviene cambiar, tu constancia y las series reales por músculo. En la semana 4 te avisa en Inicio para que lo mires antes de la descarga.',
+      '📋 Lo puedes copiar en texto para preparar el próximo bloque con tu asistente de IA.',
+    ] },
     { v: 13, date: '2026-10-15', items: [
       '🏋️ <b>39 máquinas nuevas</b> de Hammer Strength y Matrix Magnum: remos T-Bar, Super Fly, Pendulum-X, Belt Squat, Glute Drive, Reverse Hyper, Nordic asistido, dominadas asistidas y más. Todas con su «Cómo se hace».',
       '✏️ Algunas Matrix Magnum llevan ahora su nombre oficial (Kneeling Leg Curl, Reclining Leg Extension, Standing Hip Thrust…). Tu historial no cambia.',
@@ -120,7 +124,8 @@
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
     ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «📅 Entreno pasado». Desde cada resumen puedes corregir pesos y fechas.'],
-    ['💪', 'Mira tu volumen', 'En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
+    ['📊', 'Informe del bloque', 'En Historial: cómo va cada ejercicio desde tu última descarga y cuáles conviene cambiar. Tras una descarga empieza un bloque nuevo.'],
+    ['💪', 'Mira tu volumen','En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
     ['🧘', 'Calentar y estirar', 'Al empezar el entreno tienes un calentamiento de ~6 min y, al final, estiramientos suaves. Toca «Guiado» y la app te cronometra cada paso; o «Hoy no».'],
     ['🔥', 'Racha y comodines', 'Cumple tus días por semana. Tienes 2 comodines al mes para las semanas complicadas.'],
     ['💾', 'Copia de seguridad', 'Tus datos viven solo en este móvil. Exporta una vez al mes y guárdala en Drive.'],
@@ -337,7 +342,9 @@
         <small>Sexo, edad, peso y altura para calcular tus calorías y proteína.</small></div><span class="chev">›</span></a>`;
     }
 
-    if (r) {
+    const blk = blockNudge(r, true);
+    h += blk;
+    if (r && !blk) {
       // Aviso de descarga si varios ejercicios están estancados.
       const stalled = new Set();
       r.days.forEach(d => d.exercises.forEach(x => {
@@ -922,6 +929,109 @@
       <p class="muted small">${metric === 'sets' ? `Semanas completas, hasta 12. Principal 1 serie, secundario ½.` : '1RM estimado de cada ejercicio de este grupo frente a su primera sesión (100 = como empezaste). Sube aunque cambies de peso o reps.'}</p></div>`;
   }
 
+  // ---------- informe de fin de bloque ----------
+  // Bloque = desde la última descarga de la rutina activa (o desde su primer entreno) hasta hoy.
+  // Por ejercicio compara el 1RM estimado de la primera sesión del bloque con el mejor de las dos últimas.
+  const BLOCK_WEEKS = 4; // a partir de aquí, toca descarga
+  function blockInfo(r) {
+    const all = S().workouts.filter(w => w.routineId === r.id && w.type !== 'hiit').sort((a, b) => a.start - b.start);
+    const deload = all.filter(w => w.type === 'descarga').pop();
+    const ws = all.filter(w => w.type !== 'descarga' && (!deload || w.start > deload.start));
+    if (!ws.length) return null;
+    const from = ws[0].start, thisWeek = weekStart(Date.now());
+    const full = Math.max(0, Math.round((thisWeek - weekStart(from)) / (7 * 864e5)));
+    const inFull = ws.filter(w => w.start < thisWeek);
+    const ids = [...new Set(r.days.flatMap(d => d.exercises.map(x => x.exId)))];
+    const target = id => r.days.flatMap(d => d.exercises).find(x => x.exId === id);
+    const exs = ids.map(id => {
+      const hist = Progression.historyFor(id).filter(h => h.date >= from).reverse(); // de la más antigua a la más reciente
+      const mode = Store.exSettings(id).mode, n = hist.length;
+      const sore = hist.filter(h => h.pain.length).length;
+      const x = { id, n, sore, first: hist[0], last: hist[n - 1], pct: null, status: 'new' };
+      if (n >= 2) {
+        if (['goma', 'tiempo'].includes(mode)) x.status = Progression.suggest(id, target(id)).type === 'up' ? 'up' : 'flat';
+        else {
+          const a = Progression.bestE1rm(hist[0].sets), b = Math.max(...hist.slice(-2).map(h => Progression.bestE1rm(h.sets)));
+          x.pct = a ? Math.round((b / a - 1) * 100) : null;
+          x.status = x.pct >= 3 ? 'up' : 'flat';
+        }
+      }
+      // Candidato a cambiar: 4+ sesiones sin avanzar en todo el bloque, o molestias repetidas.
+      x.swap = (n >= 4 && x.status === 'flat' && (x.pct == null || x.pct <= 0)) || sore >= 2;
+      if (x.swap) x.alt = Generator.alternatives(id, 6, ids)[0] || null;
+      return x;
+    });
+    const vol = {};
+    inFull.forEach(w => w.exercises.forEach(e => addVol(vol, e.exId, e.sets.filter(s => s.done !== false).length)));
+    Object.keys(vol).forEach(m => { vol[m] /= full || 1; });
+    const rated = ws.filter(w => w.energy);
+    return { r, from, ws, full, week: full + 1, exs, vol, plan: planVolume(r),
+      planned: full * r.days.length, doneFull: inFull.length,
+      energy: rated.length ? rated.reduce((a, w) => a + w.energy, 0) / rated.length : 0,
+      prs: prEvents().filter(p => p.w.start >= from && ids.includes(p.e.exId)).length,
+      deload: full >= BLOCK_WEEKS || exs.filter(x => x.status === 'flat' && x.n >= 3).length >= 3 };
+  }
+  const BLOCK_ST = { up: ['⬆️', 'Sube', 'ok'], flat: ['➡️', 'Estancado', 'warn'], new: ['🆕', 'Pocas sesiones', 'muted'] };
+  function blockExRow(x) {
+    const ex = Store.exercise(x.id), st = BLOCK_ST[x.status];
+    const span = x.n >= 2 ? `${esc(Progression.fmtSet(x.id, x.first.sets[0]))} → ${esc(Progression.fmtSet(x.id, x.last.sets[0]))}` : x.n ? '1 sesión' : 'Sin hacer en este bloque';
+    return `<a class="blk-ex" href="#/ejercicio/${x.id}">${thumb(x.id, 'sm')}<div class="grow"><b>${esc(ex.name)}</b><small>${span}</small>
+      ${x.sore ? `<small class="blk-warn">⚠️ Molestias en ${x.sore} de ${x.n} sesiones</small>` : ''}
+      ${x.swap ? `<small class="blk-swap">💡 ${x.alt ? `Prueba a cambiarlo por <b>${esc(Store.exercise(x.alt.id).name)}</b>` : 'Plantéate cambiarlo por otro del mismo patrón'}</small>` : ''}</div>
+      <span class="blk-st ${st[2]}">${st[0]} ${x.pct != null ? `${x.pct > 0 ? '+' : ''}${x.pct} %` : st[1]}</span></a>`;
+  }
+  function viewBlock() {
+    const r = activeRoutine(), b = r && blockInfo(r);
+    if (!b) return `<div class="card hero"><div class="day-ic big">📊</div><p class="muted">${r ? 'Haz unos cuantos entrenos de tu rutina y aquí verás cómo va el bloque.' : 'Activa una rutina para ver el informe del bloque.'}</p></div>`;
+    const up = b.exs.filter(x => x.status === 'up'), flat = b.exs.filter(x => x.status === 'flat'), swap = b.exs.filter(x => x.swap);
+    const fromTxt = new Date(b.from).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    let h = `<div class="card hero sum blk-hero"><p class="lift-label">${esc(r.name)} · desde el ${fromTxt}</p>
+      <div class="lift">Semana <b>${b.week}</b></div>
+      <p class="lift-cmp">${b.deload ? '🔋 Toca semana de descarga' : `Sigue así: te quedan ~${BLOCK_WEEKS - b.full} ${BLOCK_WEEKS - b.full === 1 ? 'semana' : 'semanas'} de bloque`}</p>
+      <div class="stats inner"><div><b>${up.length}</b><small>suben</small></div><div><b>${flat.length}</b><small>estancados</small></div><div><b>${b.prs}</b><small>récords</small></div></div>
+      ${b.deload ? '<button class="btn primary" data-act="quick" data-type="descarga">Empezar descarga</button>' : ''}</div>`;
+    if (b.full) h += `<div class="card row between"><div class="grow"><small>Constancia (semanas completas)</small><b>${b.doneFull} de ${b.planned} entrenos</b></div>
+      ${b.energy ? `<div><small>Energía media</small><b>${Cycle.ENERGY[Math.round(b.energy)].icon} ${fmtNum(b.energy)}/4</b></div>` : ''}</div>`;
+    if (swap.length) h += `<div class="card warn-soft"><b>💡 ${swap.length === 1 ? 'Un ejercicio' : `${swap.length} ejercicios`} para revisar</b>
+      <p class="small">Sin avanzar en todo el bloque o con molestias repetidas. Cambiarlo en el próximo bloque suele desbloquear el progreso.</p></div>`;
+    const order = { flat: 0, new: 2, up: 1 };
+    h += `<div class="card"><h3>📈 Ejercicio a ejercicio</h3>${b.exs.slice().sort((x, y) => y.swap - x.swap || order[x.status] - order[y.status]).map(blockExRow).join('')}
+      <p class="muted small">Primera serie de la primera sesión → de la última. El % compara el 1RM estimado: sube aunque cambies de peso o reps.</p></div>`;
+    if (b.full) h += `<div class="card"><h3>💪 Series por músculo · media semanal</h3><p class="muted small">Lo que has hecho de verdad; la rayita marca lo que prevé tu rutina.</p>${volBars(b.vol, b.plan)}</div>`;
+    h += `<div class="card ai-sum"><h3>📋 Informe en texto</h3><p class="muted small">Para pegarlo en tu asistente de IA y preparar el próximo bloque.</p>
+      <textarea id="blk-text" rows="8" readonly>${esc(blockText(b))}</textarea>
+      <div class="row gap"><button class="btn primary" data-act="copy-summary" data-target="blk-text">Copiar</button>
+      ${navigator.share ? '<button class="btn ghost" data-act="share-summary" data-target="blk-text">Compartir…</button>' : ''}</div></div>`;
+    return h;
+  }
+  function blockText(b) {
+    const L = [`Informe de bloque GymLog · rutina "${b.r.name}"`,
+      `Desde el ${new Date(b.from).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} · semana ${b.week} · ${b.ws.length} entrenos`];
+    if (b.full) L.push(`Constancia: ${b.doneFull} de ${b.planned} entrenos previstos en ${b.full} ${b.full === 1 ? 'semana completa' : 'semanas completas'}`);
+    if (b.energy) L.push(`Energía media al terminar: ${fmtNum(b.energy)}/4`);
+    L.push(`Récords (1RM estimado): ${b.prs}`, '', 'Ejercicios (primera sesión → última · cambio de 1RM estimado):');
+    b.exs.forEach(x => {
+      const ex = Store.exercise(x.id);
+      const span = x.n >= 2 ? `${Progression.fmtSet(x.id, x.first.sets[0])} → ${Progression.fmtSet(x.id, x.last.sets[0])}` : `${x.n} sesiones`;
+      L.push(`- ${ex.name}: ${span} · ${x.pct != null ? `${x.pct > 0 ? '+' : ''}${x.pct} %` : BLOCK_ST[x.status][1].toLowerCase()} (${x.n} sesiones)` +
+        (x.sore ? ` · molestias en ${x.sore}` : '') + (x.swap ? ` · REVISAR${x.alt ? `, alternativa: ${x.alt.name}` : ''}` : ''));
+    });
+    if (b.full) {
+      L.push('', 'Series por semana (hechas / previstas):');
+      Object.keys({ ...b.plan, ...b.vol }).filter(m => b.vol[m] || b.plan[m]).sort((m, n) => (b.vol[n] || 0) - (b.vol[m] || 0))
+        .forEach(m => L.push(`- ${m}: ${fmtNum(b.vol[m] || 0)} / ${fmtNum(b.plan[m] || 0)}`));
+    }
+    L.push('', b.deload ? 'La app recomienda semana de descarga.' : `La app recomienda seguir ~${BLOCK_WEEKS - b.full} semanas más.`);
+    return L.join('\n');
+  }
+  function blockNudge(r, home) {
+    const b = r && blockInfo(r);
+    if (!b || (home && !b.deload) || b.ws.length < 2) return '';
+    const up = b.exs.filter(x => x.status === 'up').length, swap = b.exs.filter(x => x.swap).length;
+    return `<a class="card row between nudge" href="#/bloque"><div class="grow"><b>📊 ${home ? `Fin de bloque: semana ${b.week}` : `Informe del bloque · semana ${b.week}`}</b>
+      <small>${up} ${up === 1 ? 'ejercicio sube' : 'ejercicios suben'}${swap ? ` · ${swap} para revisar` : ''}${home ? ' · míralo antes de la descarga' : ''}</small></div><span class="chev">›</span></a>`;
+  }
+
   // Selector de ejercicios: para rutinas (añadir/cambiar) o para el entreno en curso.
   let pickerCtx = null;
   function viewPicker(rid, di, xi) {
@@ -1441,7 +1551,7 @@
     const links = `<div class="link-grid"><a class="card nudge" href="#/mes"><b>📅 ${monthName(monthKey(Date.now()))[0].toUpperCase() + monthName(monthKey(Date.now())).slice(1)}</b>
         <small>${m.ws.length} ${m.ws.length === 1 ? 'entreno' : 'entrenos'} · resumen</small></a>
       <a class="card nudge" href="#/medidas"><b>📏 Medidas</b><small>${waist ? `Cintura ${fmtNum(waist.v)} cm` : 'Cintura, peso…'}</small></a></div>`;
-    return links + weekVolumeCard() + groupProgressCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + list;
+    return links + blockNudge(activeRoutine()) + weekVolumeCard() + groupProgressCard() + cyLink + `<div class="section-head"><h2>Historial</h2></div>` + pastBtn + list;
   }
 
   const ymd = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -1681,6 +1791,7 @@
     [/^#\/actividad\/nueva(?:\/(\w+))?$/, t => viewActivity(null, t), 'home', 'Fuera del gym'],
     [/^#\/actividad\/(\w+)$/, id => viewActivity(id), 'historial', 'Actividad'],
     [/^#\/logros$/, viewMedals, 'home', 'Logros'],
+    [/^#\/bloque$/, viewBlock, 'historial', 'Informe del bloque'],
     [/^#\/mes(?:\/(\d{4}-\d{2}))?$/, viewMonth, 'historial', 'Resumen del mes'],
   ];
   function render(keepScroll) {
@@ -2079,13 +2190,13 @@
       if (!confirm('¿Borrar todas las fechas y opciones del ciclo? Tus entrenos y valoraciones se mantienen.')) return;
       Cycle.reset(); toast('Datos del ciclo borrados'); render(true);
     },
-    'copy-summary': () => {
-      const ta = document.getElementById('sum-text');
+    'copy-summary': el => {
+      const ta = document.getElementById(el.dataset.target || 'sum-text');
       const fallback = () => { ta.select(); try { document.execCommand('copy'); toast('📋 Resumen copiado'); } catch (e) { toast('Mantén pulsado el texto para copiarlo'); } };
       if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => toast('📋 Resumen copiado'), fallback);
       else fallback();
     },
-    'share-summary': () => navigator.share({ text: document.getElementById('sum-text').value }).catch(() => {}),
+    'share-summary': el => navigator.share({ text: document.getElementById(el.dataset.target || 'sum-text').value }).catch(() => {}),
     'timer-add': el => Timer.add(Number(el.dataset.s)),
     'timer-stop': () => Timer.stop(),
     export: () => { exportBackup(); render(true); },

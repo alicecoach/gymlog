@@ -670,3 +670,15 @@ svg.body .m2 { fill: var(--accent); }
 .order-btns { display: flex; flex-direction: column; }
 .order-btns .icon:disabled { opacity: .25; cursor: default; }
 .order-panel .btn.block { margin-top: 12px; }
+
+/* Informe de fin de bloque */
+.blk-hero .lift { font-size: 1.6rem; }
+.blk-hero .btn { margin-top: 12px; }
+.blk-ex { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.blk-ex b, .blk-ex small { display: block; }
+.blk-ex small { color: var(--muted); font-size: .78rem; }
+.blk-ex small.blk-warn { color: var(--warn); }
+.blk-ex small.blk-swap { color: var(--text); }
+.blk-ex small.blk-swap b { display: inline; }
+.blk-st { flex: none; font-size: .78rem; font-weight: 800; white-space: nowrap; }
+.blk-st.ok { color: var(--ok); } .blk-st.warn { color: var(--warn); } .blk-st.muted { color: var(--muted); }
