@@ -86,6 +86,28 @@ const MACHINES = (() => {
   HP('hs-iso-leg-curl', 'Iso-Lateral Leg Curl (tumbado)', 'knee_flex', 'plates', ['Isquios'], [], { unilateral: true, like: ['g-prone-curl', 'hss-prone-curl', 'mu-prone-curl'] });
   HP('hs-multisquat-rdl', 'MultiSquat · Peso muerto rumano', 'hinge', 'plates', ['Isquios', 'Glúteo'], ['Lumbar'], { like: ['g-rdl', 'g-db-rdl'] });
   HP('hs-seated-calf', 'Seated Calf Raise', 'calf', 'plates', ['Gemelos']);
+  HP('hs-iso-horizontal-bench', 'Iso-Lateral Horizontal Bench Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps', 'Hombro'], { unilateral: true, like: ['hs-iso-bench'] });
+  HP('hs-chest-back-press', 'Iso-Lateral Chest/Back · press de pecho', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps', 'Hombro'], { unilateral: true });
+  HP('hs-chest-back-row', 'Iso-Lateral Chest/Back · remo', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps'], { unilateral: true, like: ['hs-iso-row'] });
+  HP('hs-super-fly', 'Super Fly', 'fly', 'plates', ['Pecho'], ['Hombro']);
+  HP('hs-iso-tbar', 'Iso-Lateral T-Bar Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps'], { unilateral: true, like: ['hs-tbar', 'mm-tbar'] });
+  HP('hs-tbar', 'T-Bar Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps', 'Lumbar'], { like: ['mm-tbar'] });
+  HP('hs-pullover', 'Pullover', 'pull_vertical', 'plates', ['Dorsal'], ['Pecho'], { compound: false, like: ['g-db-pullover'] });
+  HP('hs-lateral-raise', 'Lateral Raise', 'lateral_raise', 'plates', ['Hombro'], [], { like: ['hss-lateral-raise', 'mm-lateral-raise', 'mu-lateral-raise'] });
+  HP('hs-seated-biceps', 'Seated Biceps', 'biceps', 'plates', ['Bíceps'], [], { unilateral: true });
+  HP('hs-seated-dip', 'Seated Dip', 'triceps', 'plates', ['Tríceps'], ['Pecho', 'Hombro'], { like: ['g-machine-dip'] });
+  HP('hs-ab-oblique', 'Abdominal / Oblique Crunch', 'core', 'plates', ['Abdomen']);
+  HP('hs-combo-twist', 'Ground Base Combo Twist', 'core', 'plates', ['Abdomen'], ['Hombro'], { unilateral: true });
+  HP('hs-jammer', 'Ground Base Jammer', 'power', 'plates', ['Hombro', 'Cuádriceps'], ['Tríceps', 'Glúteo', 'Pecho']);
+  HP('hs-gb-squat', 'Ground Base Squat / High Pull', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Espalda alta', 'Isquios']);
+  HP('hs-super-squat', 'Super Squat Press', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores']);
+  HP('hs-pendulum-x', 'Pendulum-X Squat', 'squat', 'plates', ['Cuádriceps'], ['Glúteo'], { like: ['mm-pendulum', 'g-pendulum'] });
+  HP('hs-reverse-v', 'Reverse V-Squat', 'squat', 'plates', ['Glúteo', 'Cuádriceps'], ['Isquios']);
+  HP('hs-belt-squat', 'Belt Squat', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores'], { like: ['mm-belt-squat'] });
+  HP('hs-glute-drive', 'Glute Drive (hip thrust)', 'hinge', 'plates', ['Glúteo'], ['Isquios'], { compound: false, like: ['g-hip-thrust-machine', 'g-hip-thrust'] });
+  HP('hs-reverse-hyper', 'Glute Ham / Reverse Hyper · hiperextensión inversa', 'hinge', 'plates', ['Glúteo'], ['Isquios', 'Lumbar'], { compound: false, like: ['mm-reverse-back-ext'] });
+  HP('hs-ghd-back-ext', 'Glute Ham / Reverse Hyper · extensión de cadera', 'hinge', 'plates', ['Isquios', 'Glúteo'], ['Lumbar'], { compound: false });
+  HP('hs-nordic', 'Assisted Nordic Ham', 'knee_flex', 'plates', ['Isquios'], [], { like: ['g-nordic'] });
 
   // ---------- Hammer Strength · Select (placas) ----------
   const HS = (...a) => add('Hammer Strength', 'Select', ...a);
@@ -105,6 +127,13 @@ const MACHINES = (() => {
   HS('hss-triceps', 'Triceps Extension', 'triceps', 'stack', ['Tríceps']);
   HS('hss-ab-crunch', 'Abdominal Crunch', 'core', 'stack', ['Abdomen']);
   HS('hss-back-ext', 'Back Extension', 'hinge', 'stack', ['Lumbar'], ['Glúteo', 'Isquios'], { compound: false });
+  HS('hss-assist-pullup', 'Assist Dip Chin · dominadas asistidas', 'pull_vertical', 'stack', ['Dorsal'], ['Bíceps', 'Espalda alta'], { like: ['g-assisted-pullup'] });
+  HS('hss-assist-dip', 'Assist Dip Chin · fondos asistidos', 'triceps', 'stack', ['Tríceps'], ['Pecho', 'Hombro'], { like: ['g-machine-dip'] });
+  HS('hss-fixed-pulldown', 'Fixed Pulldown', 'pull_vertical', 'stack', ['Dorsal'], ['Bíceps', 'Espalda alta']);
+  HS('hss-lateral-raise', 'Lateral Raise', 'lateral_raise', 'stack', ['Hombro'], [], { like: ['mu-lateral-raise'] });
+  HS('hss-hip-glute', 'Hip and Glute', 'hinge', 'stack', ['Glúteo'], ['Isquios'], { compound: false, unilateral: true, like: ['mu-glute', 'mm-glute'] });
+  HS('hss-horizontal-calf', 'Horizontal Calf', 'calf', 'stack', ['Gemelos']);
+  HS('hss-standing-calf', 'Standing Calf', 'calf', 'stack', ['Gemelos'], [], { like: ['mm-standing-calf'] });
 
   // ---------- Hammer Strength · MTS ----------
   const HM = (...a) => add('Hammer Strength', 'MTS', ...a);
@@ -141,25 +170,35 @@ const MACHINES = (() => {
 
   // ---------- Matrix · Magnum (discos) ----------
   const MM = (...a) => add('Matrix', 'Magnum', ...a);
-  MM('mm-incline-press', 'Incline Chest Press', 'press_incline', 'plates', ['Pecho'], ['Hombro', 'Tríceps']);
-  MM('mm-chest-press', 'Seated Chest Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps']);
+  MM('mm-incline-press', 'Incline Bench Press', 'press_incline', 'plates', ['Pecho'], ['Hombro', 'Tríceps']);
+  MM('mm-chest-press', 'Vertical Chest Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps']);
   MM('mm-lat-pulldown', 'Lat Pulldown', 'pull_vertical', 'plates', ['Dorsal'], ['Bíceps']);
   MM('mm-row', 'Seated Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps']);
   MM('mm-hack-squat', 'Hack Squat', 'squat', 'plates', ['Cuádriceps'], ['Glúteo']);
   MM('mm-leg-press', 'Leg Press 45°', 'squat', 'plates', ['Cuádriceps'], ['Glúteo', 'Aductores']);
   MM('mm-glute', 'Glute Trainer', 'hinge', 'plates', ['Glúteo'], ['Isquios']);
   MM('mm-seated-calf', 'Seated Calf', 'calf', 'plates', ['Gemelos']);
-  MM('mm-decline-press', 'Decline Chest Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps']);
+  MM('mm-decline-press', 'Vertical Decline Bench Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps']);
   MM('mm-shoulder-press', 'Shoulder Press', 'press_vertical', 'plates', ['Hombro'], ['Tríceps']);
   MM('mm-front-pulldown', 'Front Pulldown', 'pull_vertical', 'plates', ['Dorsal'], ['Bíceps', 'Espalda alta'], { unilateral: true });
   MM('mm-low-row', 'Low Row', 'row', 'plates', ['Dorsal'], ['Espalda alta', 'Bíceps'], { unilateral: true });
   MM('mm-high-row', 'High Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Hombro posterior'], { unilateral: true });
   MM('mm-pendulum', 'Pendulum Squat', 'squat', 'plates', ['Cuádriceps'], ['Glúteo']);
   MM('mm-belt-squat', 'Belt Squat', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores']);
-  MM('mm-leg-ext', 'Leg Extension', 'knee_ext', 'plates', ['Cuádriceps']);
-  MM('mm-leg-curl', 'Leg Curl', 'knee_flex', 'plates', ['Isquios']);
-  MM('mm-hip-thrust', 'Hip Thrust', 'hinge', 'plates', ['Glúteo'], ['Isquios'], { compound: false });
+  MM('mm-leg-ext', 'Reclining Leg Extension', 'knee_ext', 'plates', ['Cuádriceps']);
+  MM('mm-leg-curl', 'Kneeling Leg Curl', 'knee_flex', 'plates', ['Isquios']);
+  MM('mm-hip-thrust', 'Standing Hip Thrust', 'hinge', 'plates', ['Glúteo'], ['Isquios'], { compound: false });
   MM('mm-standing-calf', 'Standing Calf', 'calf', 'plates', ['Gemelos']);
+  MM('mm-supine-bench', 'Supine Bench Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps', 'Hombro']);
+  MM('mm-decline-fly', 'Decline Pec Fly', 'fly', 'plates', ['Pecho']);
+  MM('mm-lateral-raise', 'Seated Lateral Raise', 'lateral_raise', 'plates', ['Hombro']);
+  MM('mm-tbar', 'T-Bar Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps', 'Lumbar']);
+  MM('mm-incline-lever-row', 'Incline Lever Row', 'row', 'plates', ['Espalda alta'], ['Dorsal', 'Bíceps'], { like: ['g-chest-supported-row'] });
+  MM('mm-biceps', 'Elevated Biceps Curl', 'biceps', 'plates', ['Bíceps']);
+  MM('mm-squat-lunge', 'Squat Lunge', 'squat', 'plates', ['Cuádriceps', 'Glúteo'], ['Aductores'], { like: ['hs-squat-lunge'] });
+  MM('mm-hip-abductor', 'Standing Hip Abductor', 'abduction', 'plates', ['Glúteo'], [], { unilateral: true, like: ['g-standing-abductor'] });
+  MM('mm-reverse-back-ext', 'Reverse Back Extension', 'hinge', 'plates', ['Glúteo'], ['Isquios', 'Lumbar'], { compound: false });
+  MM('mm-ab-crunch', 'Abdominal Crunch', 'core', 'plates', ['Abdomen']);
 
   // ---------- Genérico: peso libre, poleas, multipower ----------
   const G = (...a) => add('Genérico', '', ...a);

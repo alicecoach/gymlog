@@ -29,6 +29,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 13, date: '2026-10-15', items: [
+      '🏋️ <b>39 máquinas nuevas</b> de Hammer Strength y Matrix Magnum: remos T-Bar, Super Fly, Pendulum-X, Belt Squat, Glute Drive, Reverse Hyper, Nordic asistido, dominadas asistidas y más. Todas con su «Cómo se hace».',
+      '✏️ Algunas Matrix Magnum llevan ahora su nombre oficial (Kneeling Leg Curl, Reclining Leg Extension, Standing Hip Thrust…). Tu historial no cambia.',
+    ] },
     { v: 12, date: '2026-10-15', items: [
       '🏋️ <b>Nueva máquina Hammer Strength</b>: Iso-Lateral Super Incline Press (press muy inclinado, pecho alto y hombro).',
       '🦋 La máquina doble de <b>mariposa pectoral / deltoides trasero</b> ahora se llama así en la app («Pec Fly / Rear Delt»), con la técnica de cada posición. Sale la primera en ⇄ si el pec deck está ocupado.',
