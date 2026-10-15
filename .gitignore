@@ -3,3 +3,5 @@ private/
 rutina_actual_*.md
 # Pruebas locales (borran datos del navegador)
 tests/
+# Fotos de máquinas del gimnasio (llevan pegatinas del fabricante): no se publican
+Photos maquinas*/

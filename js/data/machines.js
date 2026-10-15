@@ -66,6 +66,7 @@ const MACHINES = (() => {
   const HP = (...a) => add('Hammer Strength', 'Plate-Loaded', ...a);
   HP('hs-iso-bench', 'Iso-Lateral Bench Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps', 'Hombro'], { unilateral: true });
   HP('hs-iso-incline', 'Iso-Lateral Incline Press', 'press_incline', 'plates', ['Pecho'], ['Hombro', 'Tríceps'], { unilateral: true });
+  HP('hs-iso-super-incline', 'Iso-Lateral Super Incline Press', 'press_incline', 'plates', ['Pecho', 'Hombro'], ['Tríceps'], { unilateral: true });
   HP('hs-iso-decline', 'Iso-Lateral Decline Press', 'press_horizontal', 'plates', ['Pecho'], ['Tríceps'], { unilateral: true });
   HP('hs-iso-wide-chest', 'Iso-Lateral Wide Chest', 'press_horizontal', 'plates', ['Pecho'], ['Hombro'], { unilateral: true });
   HP('hs-iso-shoulder', 'Iso-Lateral Shoulder Press', 'press_vertical', 'plates', ['Hombro'], ['Tríceps'], { unilateral: true });
@@ -92,8 +93,8 @@ const MACHINES = (() => {
   HS('hss-shoulder-press', 'Shoulder Press', 'press_vertical', 'stack', ['Hombro'], ['Tríceps']);
   HS('hss-lat-pulldown', 'Lat Pulldown', 'pull_vertical', 'stack', ['Dorsal'], ['Bíceps']);
   HS('hss-seated-row', 'Seated Row', 'row', 'stack', ['Espalda alta'], ['Dorsal', 'Bíceps']);
-  HS('hss-pec-fly', 'Pec Fly', 'fly', 'stack', ['Pecho']);
-  HS('hss-rear-delt', 'Rear Delt', 'rear_delt', 'stack', ['Hombro posterior'], ['Espalda alta']);
+  HS('hss-pec-fly', 'Pec Fly / Rear Delt · mariposa pectoral', 'fly', 'stack', ['Pecho'], [], { like: ['g-pec-deck'] });
+  HS('hss-rear-delt', 'Pec Fly / Rear Delt · deltoides posterior', 'rear_delt', 'stack', ['Hombro posterior'], ['Espalda alta']);
   HS('hss-leg-press', 'Leg Press', 'squat', 'stack', ['Cuádriceps'], ['Glúteo']);
   HS('hss-leg-ext', 'Leg Extension', 'knee_ext', 'stack', ['Cuádriceps']);
   HS('hss-seated-curl', 'Seated Leg Curl', 'knee_flex', 'stack', ['Isquios']);

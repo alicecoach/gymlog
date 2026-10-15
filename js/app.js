@@ -29,6 +29,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 12, date: '2026-10-15', items: [
+      '🏋️ <b>Nueva máquina Hammer Strength</b>: Iso-Lateral Super Incline Press (press muy inclinado, pecho alto y hombro).',
+      '🦋 La máquina doble de <b>mariposa pectoral / deltoides trasero</b> ahora se llama así en la app («Pec Fly / Rear Delt»), con la técnica de cada posición. Sale la primera en ⇄ si el pec deck está ocupado.',
+    ] },
     { v: 11, date: '2026-10-14', items: [
       '⇅ <b>Cambia el orden</b> del entreno de hoy: toca ⇅ arriba, junto a «Terminar», y sube o baja ejercicios. Tu rutina no cambia y las superseries se mueven juntas.',
       '🏋️ <b>Nuevas máquinas Hammer Strength</b>: MultiSquat para peso muerto rumano e Iso-Lateral Leg Curl (tumbado). Salen las primeras en ⇄ cuando tu máquina está ocupada.',

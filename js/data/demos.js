@@ -4,7 +4,7 @@
 const DEMOS = (() => {
   const map = {
     '0066': ['hs-iso-bench', 'hss-chest-press', 'mts-iso-chest', 'mu-conv-chest', 'mm-chest-press', 'hs-iso-wide-chest'],
-    '0043': ['hs-iso-incline', 'mts-iso-incline', 'mm-incline-press'],
+    '0043': ['hs-iso-incline', 'hs-iso-super-incline', 'mts-iso-incline', 'mm-incline-press'],
     '0085': ['hs-iso-decline', 'mm-decline-press'],
     '0042': ['g-bench'], '0061': ['g-db-incline'], '0081': ['g-smith-incline'], '0055': ['g-db-bench'],
     '0054': ['g-dips'], '0048': ['g-cable-fly'],
