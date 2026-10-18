@@ -29,6 +29,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 16, date: '2026-10-18', items: [
+      '🎯 <b>Retos</b> (en Logros): tu primera dominada por fases, colgarte un minuto, hip thrust con el doble de tu peso, paseo del granjero, plancha lateral y 8 semanas cumpliendo.',
+      '📏 El objetivo se calcula con tus datos, un paso por encima de donde estás. Si el reto lo necesita, te propone unos minutos al final de algunos entrenos.',
+    ] },
     { v: 15, date: '2026-10-18', items: [
       '🎯 <b>Core exprés</b> en Entreno rápido: 5 ejercicios de core en ~15 min, distintos cada vez.',
       '🎛️ <b>Diséñalo tú</b>: eliges tiempo, qué quieres trabajar y el material que tienes, y la app te monta el entreno. Ideal para un día extra: no cambia tu rutina ni el día que te toca.',
@@ -127,6 +131,7 @@
     ['🏃', 'Fuera del gym', 'Correr, pádel, bici, yoga…: regístralo desde Inicio → «Fuera del gym». Sale en tu historial y en el resumen del mes, pero no cuenta para la racha de entrenos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
     ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, Core exprés o una descarga.'],
+    ['🎯', 'Retos', 'En Logros → Retos: elige una meta (uno a la vez). Al final de algunos entrenos te propone unos minutos para ir consiguiéndola; si marcas molestia de codo, no avanza a las fases duras.'],
     ['🎛️', 'Diséñalo tú', 'En Entreno rápido: elige tiempo, zona y material y te monta un entreno. Para un día extra: no cambia tu rutina ni el día que te toca.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «📅 Entreno pasado». Desde cada resumen puedes corregir pesos y fechas.'],
     ['📊', 'Informe del bloque', 'En Historial: cómo va cada ejercicio desde tu última descarga y cuáles conviene cambiar. Tras una descarga empieza un bloque nuevo.'],
@@ -338,7 +343,7 @@
   // ---------- vistas ----------
   function viewHome() {
     const s = S(), r = activeRoutine(), u = Store.currentUser();
-    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> <span class="emo">${u.avatar}</span></p>` + cycleChip() + streakCard();
+    let h = `<p class="hello">Hola, <b>${esc(u.name)}</b> <span class="emo">${u.avatar}</span></p>` + cycleChip() + streakCard() + chHomeCard();
     if (backupDue()) {
       h += `<div class="card backup"><b>💾 Toca la copia de seguridad del mes</b>
         <small>Tu historial solo vive en este móvil. Guárdala en Drive o envíatela: con una vez al mes basta.</small>
@@ -528,6 +533,9 @@
       <p class="muted">Tu objetivo: ${s.goal} días por semana · récord: ${s.best}</p>
       <div class="weeks-strip">${s.weeks.slice(-12).map(x => `<i class="${x.done ? 'on' : x.saved ? 'saved' : x.current ? 'cur' : ''}" title="${fmtDate(x.k)}">${x.saved ? '🛟' : ''}</i>`).join('')}</div>
       <p class="small">🛟 <b>${Math.max(0, s.jokersLeft)} de ${JOKERS} comodines</b> este mes. Si una semana no llegas a ${s.goal} días, se gasta uno solo y tu racha sigue.</p></div>`;
+    const ch = chStatus();
+    h += `<a class="card row between nudge" href="#/retos"><div class="grow"><b>🎯 Retos</b>
+      <small>${ch ? `${esc(ch.C.name)} · ${esc(ch.txt)}` : 'Tu primera dominada, hip thrust con el doble de tu peso… elige una meta'}${chDone().length ? ` · ${chDone().length} conseguido${chDone().length > 1 ? 's' : ''}` : ''}</small></div><span class="chev">›</span></a>`;
     h += `<div class="section-head"><h2>Medallas</h2><small>${count} de ${MEDALS.length}</small></div>`;
     [...new Set(MEDALS.map(m => m.group))].forEach(g => {
       h += `<h3 class="medal-group">${g}</h3><div class="medals">${MEDALS.filter(m => m.group === g).map(m => {
@@ -537,6 +545,161 @@
           ${on ? `<small class="when">${fmtDate(on)}</small>` : m.target > 1 ? `<div class="mbar"><i style="width:${p * 100}%"></i></div><small class="when">${prog}</small>` : ''}</div>`;
       }).join('')}</div>`;
     });
+    return h;
+  }
+
+  // ---------- retos ----------
+  // Un reto activo a la vez. El objetivo se calcula al empezarlo con tus datos (peso corporal y marcas),
+  // un paso por encima de donde estás. Algunos añaden unos minutos al final de ciertos entrenos.
+  const bw = () => Number(S().settings.bodyweight) || 0;
+  const round = (x, step) => Math.ceil(x / step - 1e-9) * step;
+  const since = (exId, t) => Progression.historyFor(exId).filter(h => h.date >= t);
+  const bestSecs = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.secs) || 0)));
+  const bestReps = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.reps) || 0)));
+  // Kilos reales: en las máquinas de discos se anota por lado.
+  const realKg = (exId, kg) => (Number(kg) || 0) * (Store.exSettings(exId).mode === 'lado' ? 2 : 1);
+  const bestKg = (exId, reps, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.filter(s => Number(s.reps) >= reps).map(s => realKg(exId, s.kg))));
+  const HIP_THRUSTS = ['g-hip-thrust', 'hs-glute-drive', 'g-hip-thrust-machine', 'mm-hip-thrust', 'g-db-hip-thrust'];
+  const firstOk = ids => ids.find(id => !excluded().includes(id)) || ids[0];
+  const chItem = (exId, sets, repMin, repMax, secs, note) => ({ exId, target: { sets, repMin, repMax, rir: 2, rest: 60, secs }, note });
+
+  const CHALLENGES = {
+    dominada: { icon: '🧗', name: 'Tu primera dominada', desc: 'De colgarte de la barra a subir la barbilla por encima, por fases.', when: 'upper',
+      warn: 'Carga mucho la flexión del codo (sobre todo las bajadas lentas). Si tienes una lesión de codo u hombro, coméntalo antes con tu fisio.',
+      phases: [
+        { name: 'Colgarse', test: 'Colgarte 30 s', ok: c => bestSecs('g-dead-hang', c.phaseAt) >= 30,
+          items: () => [chItem('g-dead-hang', 3, 0, 0, 20, 'Hombros activos, lejos de las orejas.'), chItem('g-scap-pullup', 3, 6, 8, 0, 'Sin doblar los codos.')] },
+        { name: 'Fuerza de tirón', test: 'Aguantar arriba 15 s', ok: c => bestSecs('g-flexed-hang', c.phaseAt) >= 15,
+          items: () => [chItem(firstOk(['hss-assist-pullup', 'g-assisted-pullup']), 3, 5, 8, 0, 'Cada semana, un poco menos de ayuda.'), chItem('g-flexed-hang', 3, 0, 0, 5, 'Sube con un banco y aguanta arriba.')] },
+        { name: 'Bajadas lentas', test: '3 bajadas de 5 s seguidas', ok: c => bestReps('g-negative-pullup', c.phaseAt) >= 3, elbow: true,
+          items: () => [chItem('g-negative-pullup', 3, 2, 3, 0, 'Baja en 5 s. Si molesta el codo, para y márcalo.'), chItem('g-flexed-hang', 2, 0, 0, 15, '')] },
+        { name: 'La primera', test: '1 dominada completa', ok: c => bestReps('g-pullup', c.phaseAt) >= 1, elbow: true,
+          items: () => [chItem('g-pullup', 3, 1, 1, 0, 'Intentos de 1, descansando bien entre ellos. Anota 1 si sube la barbilla.'), chItem('g-negative-pullup', 2, 2, 3, 0, '')] },
+      ] },
+    colgarse: { icon: '🐒', name: 'Colgarte un minuto', desc: 'Agarre y salud del hombro: aguantar colgado de la barra.', when: 'upper',
+      target: () => ({ secs: Math.max(60, round(bestSecs('g-dead-hang') + 15, 15)) }),
+      goal: t => `${t.secs} s colgado`, value: () => bestSecs('g-dead-hang'), max: t => t.secs, fmt: v => `${v} s`,
+      items: () => [chItem('g-dead-hang', 3, 0, 0, 20, 'Hombros activos. Sube 5–10 s cuando aguantes todas las series.')] },
+    hipthrust: { icon: '🍑', name: 'Hip thrust con el doble de tu peso', desc: 'Fuerza de glúteo: 8 repeticiones con el doble de lo que pesas.', needsBw: true,
+      target: () => {
+        const exId = HIP_THRUSTS.filter(id => !excluded().includes(id)).sort((a, b) => Progression.historyFor(b).length - Progression.historyFor(a).length)[0] || 'g-hip-thrust';
+        return { exId, kg: Math.max(round(bw() * 2, 2.5), round(bestKg(exId, 8) + 5, 2.5)), reps: 8 };
+      },
+      goal: t => `${fmtNum(t.kg)} kg × ${t.reps} en ${Store.exercise(t.exId).name}`, value: c => bestKg(c.target.exId, c.target.reps), max: t => t.kg, fmt: v => `${fmtNum(v)} kg`,
+      tip: t => Store.exSettings(t.exId).mode === 'lado' ? 'Cuentan los kilos de los dos lados juntos.' : 'Sigue tu rutina: cada vez que subas peso con 8 reps, la barra avanza.' },
+    granjero: { icon: '🧺', name: 'Paseo del granjero', desc: 'Agarre, core y postura: 40 m con una mancuerna pesada en cada mano.', needsBw: true, when: 'lower',
+      target: () => ({ kg: Math.max(round(bw() * .4, 2), round(bestKg('g-farmer-carry', 1) + 4, 2)) }),
+      goal: t => `40 m con ${t.kg} kg en cada mano`, value: () => bestKg('g-farmer-carry', 1), max: t => t.kg, fmt: v => `${fmtNum(v)} kg/mano`,
+      items: c => [chItem('g-farmer-carry', 3, 30, 40, 0, `Las «reps» son metros. Objetivo: ${c.target.kg} kg por mano, erguida y sin soltar.`)] },
+    plancha: { icon: '📐', name: 'Plancha lateral', desc: 'Core lateral sin apoyar los codos: plancha sobre la mano.', when: 'any',
+      target: () => ({ secs: Math.max(45, round(bestSecs('g-side-plank-hand') + 15, 15)) }),
+      goal: t => `${t.secs} s por lado`, value: () => bestSecs('g-side-plank-hand'), max: t => t.secs, fmt: v => `${v} s`,
+      items: () => [chItem('g-side-plank-hand', 2, 0, 0, 20, 'Por lado. Cadera alta, en línea con hombros y pies.')] },
+    constancia: { icon: '📆', name: '8 semanas cumpliendo', desc: 'Tus días de entreno cada semana, 8 semanas seguidas (los comodines te salvan una semana).',
+      target: () => ({ weeks: 8 }), goal: t => `${t.weeks} semanas seguidas con ${weekGoal()} días`,
+      value: c => {
+        let n = 0;
+        streakTimeline().weeks.filter(x => x.k >= weekStart(c.start)).forEach(x => { if (x.done) n++; else if (!x.saved && !x.current) n = 0; });
+        return n;
+      }, max: t => t.weeks, fmt: v => `${v} ${v === 1 ? 'semana' : 'semanas'}` },
+  };
+  const chActive = () => S().challenge && CHALLENGES[S().challenge.id] ? S().challenge : null;
+  const chDone = () => S().challengesDone || [];
+  // Ejercicios del reto que tienes en ⛔ Evitar (se avisa, no se esconde el reto).
+  function chAvoided(id) {
+    const C = CHALLENGES[id], fake = { id, start: 0, phaseAt: 0, target: C.target ? C.target() : {} };
+    const items = C.phases ? C.phases.flatMap(p => p.items(fake)) : C.items ? C.items(fake) : [];
+    return [...new Set(items.map(x => x.exId).filter(x => excluded().includes(x)))];
+  }
+  // Molestia de codo en algún ejercicio del reto en las 2 últimas sesiones: no se avanza a fases más duras.
+  function chElbow(c) {
+    return S().workouts.filter(w => w.start >= c.phaseAt && w.exercises.some(e => e.ch)).slice(-2)
+      .some(w => w.exercises.some(e => e.ch && (e.pain || []).includes('codo')));
+  }
+  // Estado del reto activo: progreso 0–1, texto, y si toca subir de fase o está conseguido.
+  function chStatus(c = chActive()) {
+    if (!c) return null;
+    const C = CHALLENGES[c.id];
+    if (C.phases) {
+      const ph = C.phases[c.phase], passed = ph.ok(c), next = C.phases[c.phase + 1];
+      const blocked = passed && next?.elbow && chElbow(c);
+      return { C, ph, p: (c.phase + (passed ? 1 : 0)) / C.phases.length, passed, blocked, done: passed && !next,
+        txt: `Fase ${c.phase + 1} de ${C.phases.length}: ${ph.name}`, goal: `Para pasar: ${ph.test.toLowerCase()}` };
+    }
+    const v = C.value(c), max = C.max(c.target);
+    return { C, p: Math.min(1, v / max), done: v >= max, txt: `${C.fmt(v)} de ${C.fmt(max)}`, goal: C.goal(c.target) };
+  }
+  // Tras guardar un entreno: sube de fase o da el reto por conseguido. Devuelve el aviso para el resumen.
+  function chUpdate() {
+    const c = chActive(), st = chStatus(c);
+    if (!st) return null;
+    if (st.done) {
+      S().challengesDone = chDone().concat({ id: c.id, start: c.start, at: Date.now(), goal: st.C.phases ? st.C.name : st.C.goal(c.target) });
+      S().challenge = null;
+      return { kind: 'done', icon: st.C.icon, title: '¡Reto conseguido!', txt: st.C.phases ? st.C.name : st.C.goal(c.target) };
+    }
+    if (st.passed && !st.blocked) {
+      c.phase++; c.phaseAt = Date.now();
+      return { kind: 'phase', icon: st.C.icon, title: `¡Fase ${c.phase + 1} desbloqueada!`, txt: st.C.phases[c.phase].name };
+    }
+    return null;
+  }
+  const chItems = c => { const C = CHALLENGES[c.id]; return C.phases ? C.phases[c.phase].items(c) : C.items ? C.items(c) : []; };
+  // ¿Se ofrece el bloque del reto al final de este entreno? En los días que encajan y como mucho uno de cada dos días.
+  function chOffer(w) {
+    const c = chActive();
+    if (!c || w.chAsked || w.past || !chItems(c).length || w.exercises.some(e => e.ch)) return false;
+    if (!['rutina', 'fullbody', 'torso', 'pierna', 'custom', 'calistenia'].includes(w.type || 'rutina')) return false;
+    const want = CHALLENGES[c.id].when, reg = prepRegion(w);
+    if (want === 'upper' && reg === 'lower' || want === 'lower' && reg === 'upper') return false;
+    return !S().workouts.some(x => daysAgo(x.start) <= 1 && x.exercises.some(e => e.ch));
+  }
+  function chOfferCard(w) {
+    const c = chActive(), C = CHALLENGES[c.id], items = chItems(c);
+    const mins = Math.round(items.reduce((a, x) => a + x.target.sets * ((x.target.secs || 40) + x.target.rest), 0) / 60);
+    return `<div class="card core-offer ch-offer"><span class="mi">${C.icon}</span><div class="grow"><b>Reto: ${esc(C.name)}</b>
+      <small>${items.length} ${items.length === 1 ? 'ejercicio' : 'ejercicios'} · ~${mins} min${C.phases ? ` · fase ${c.phase + 1}` : ''}</small></div>
+      <div class="row gap"><button class="btn small primary" data-act="ch-add">Añadir</button><button class="btn small ghost" data-act="ch-skip">Hoy no</button></div></div>`;
+  }
+  function chHomeCard() {
+    const c = chActive(), st = chStatus(c);
+    if (!st) return '';
+    return `<a class="card row ch-home" href="#/retos"><span class="mi">${st.C.icon}</span><div class="grow"><b>${esc(st.C.name)}</b>
+      <small>${esc(st.txt)}</small><div class="mbar"><i style="width:${st.p * 100}%"></i></div></div><span class="chev">›</span></a>`;
+  }
+  function viewChallenges() {
+    const c = chActive(), st = chStatus(c);
+    let h = '';
+    if (st) {
+      const C = st.C;
+      h += `<div class="card hero ch-hero"><span class="mi big">${C.icon}</span><h2>${esc(C.name)}</h2>
+        <p class="muted small">Empezado el ${fmtDate(c.start)}</p>`;
+      if (C.phases) {
+        h += `<ol class="ch-phases">${C.phases.map((p, i) => `<li class="${i < c.phase ? 'ok' : i === c.phase ? 'now' : ''}"><b>${esc(p.name)}</b><small>${esc(p.test)}</small></li>`).join('')}</ol>`;
+        if (chElbow(c)) h += `<div class="card warn">Has marcado molestia en el codo: no pasarás a las fases más duras hasta que deje de molestar. Si sigue, coméntalo con tu fisio.</div>`;
+      } else {
+        h += `<p class="ch-goal">${esc(st.goal)}</p><div class="mbar big"><i style="width:${st.p * 100}%"></i></div><p class="small">${esc(st.txt)}</p>`;
+        if (C.tip) h += `<p class="muted small">${esc(C.tip(c.target))}</p>`;
+      }
+      const items = chItems(c);
+      h += items.length ? `<p class="muted small">En tus días de ${{ upper: 'tren superior', lower: 'pierna', any: 'entreno' }[C.when] || 'entreno'}, al terminar, te propondrá: ${items.map(x => `${esc(Store.exercise(x.exId).name)} (${x.target.sets} × ${x.target.secs ? x.target.secs + ' s' : x.target.repMin === x.target.repMax ? x.target.repMin : x.target.repMin + '–' + x.target.repMax})`).join(', ')}.</p>` : '';
+      if (C.phases && c.phase < C.phases.length - 1) h += `<button class="btn small ghost" data-act="ch-next">Ya lo consigo: siguiente fase</button>`;
+      h += `<button class="btn small ghost danger" data-act="ch-quit">Abandonar el reto</button></div>`;
+    }
+    h += `<div class="section-head"><h2>${st ? 'Otros retos' : 'Elige un reto'}</h2><small>uno a la vez</small></div>`;
+    if (!st) h += `<p class="muted small">Una meta concreta con su camino. La app calcula el objetivo con tus datos y, si hace falta, te añade unos minutos al final de algunos entrenos.</p>`;
+    Object.entries(CHALLENGES).filter(([id]) => id !== c?.id).forEach(([id, C]) => {
+      const t = C.target && (!C.needsBw || bw()) ? C.target() : null, avoid = chAvoided(id), got = chDone().filter(x => x.id === id).length;
+      h += `<div class="card ch-card"><div class="row ch-top"><span class="mi">${C.icon}</span><div class="grow"><b>${esc(C.name)}</b><small>${esc(C.desc)}</small></div></div>
+        ${t ? `<p class="small">🎯 Para ti: <b>${esc(C.goal(t))}</b></p>` : C.needsBw ? `<p class="small muted">Pon tu peso en <a href="#/ajustes">Ajustes</a> para calcular tu objetivo.</p>` : C.phases ? `<p class="small">${C.phases.length} fases: ${C.phases.map(p => esc(p.name.toLowerCase())).join(' → ')}</p>` : ''}
+        ${C.warn ? `<p class="small warn-txt">⚠️ ${esc(C.warn)}</p>` : ''}
+        ${avoid.length ? `<p class="small warn-txt">⛔ Incluye ejercicios que tienes en Evitar: ${avoid.map(x => esc(Store.exercise(x).name)).join(', ')}.</p>` : ''}
+        <div class="row between">${got ? `<small class="ch-got">🏅 Conseguido${got > 1 ? ` ${got} veces` : ''}</small>` : '<span></span>'}
+        <button class="btn small ${st ? 'ghost' : 'primary'}" data-act="ch-start" data-id="${id}" ${C.needsBw && !bw() ? 'disabled' : ''}>Empezar</button></div></div>`;
+    });
+    const done = chDone().slice().reverse();
+    if (done.length) h += `<div class="section-head"><h2>Conseguidos</h2></div><div class="medals">${done.map(d => `<div class="medal on"><span class="mi">${CHALLENGES[d.id]?.icon || '🏅'}</span>
+      <b>${esc(CHALLENGES[d.id]?.name || d.goal)}</b><small>${esc(d.goal)}</small><small class="when">${fmtDate(d.at)}</small></div>`).join('')}</div>`;
     return h;
   }
 
@@ -1279,6 +1442,7 @@
         <small>3 ejercicios · ~6 min</small></div>
         <div class="row gap"><button class="btn small primary" data-act="add-core">Añadir</button><button class="btn small ghost" data-act="skip-core">Hoy no</button></div></div>`;
     }
+    if (chOffer(w)) h += chOfferCard(w);
     if (prepOn(w) && w.exercises.length) h += prepCard(w, 'cool');
     h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a>
       <button class="btn block ghost danger" data-act="discard">Descartar entreno</button>`;
@@ -1496,6 +1660,7 @@
       const s = streak();
       h += `<div class="week-done">🔥 <b>¡Semana cumplida!</b>${wk === weekStart(Date.now()) && s.cur > 1 ? ` Llevas <b>${s.cur} semanas seguidas</b>.` : ` ${goal} de ${goal} días.`}</div>`;
     }
+    if (w.chEvent) h += `<a class="new-medal ch-event" href="#/retos"><span class="mi">${w.chEvent.icon}</span><div><small>${esc(w.chEvent.title)}</small><b>${esc(w.chEvent.txt)}</b></div></a>`;
     const fresh = medalsFrom(w);
     if (fresh.length) h += `<div class="new-medals">${fresh.map(m => `<a class="new-medal" href="#/logros"><span class="mi">${m.icon}</span><div><small>¡Medalla nueva!</small><b>${m.name}</b><small>${m.desc}</small></div></a>`).join('')}</div>`;
     h += `<div class="stats inner"><div><b>${doneSets(w)}</b><small>series</small></div><div><b>${w.exercises.length}</b><small>ejercicios</small></div><div><b>${fmtDur(w.end - w.start)}</b><small>duración</small></div></div></div>`;
@@ -1834,6 +1999,7 @@
     [/^#\/actividad\/nueva(?:\/(\w+))?$/, t => viewActivity(null, t), 'home', 'Fuera del gym'],
     [/^#\/actividad\/(\w+)$/, id => viewActivity(id), 'historial', 'Actividad'],
     [/^#\/logros$/, viewMedals, 'home', 'Logros'],
+    [/^#\/retos$/, viewChallenges, 'home', 'Retos'],
     [/^#\/bloque$/, viewBlock, 'historial', 'Informe del bloque'],
     [/^#\/mes(?:\/(\d{4}-\d{2}))?$/, viewMonth, 'historial', 'Resumen del mes'],
   ];
@@ -1861,7 +2027,7 @@
     animateCounts();
     // Al terminar un entreno: confeti si ha caído medalla o se ha cumplido la semana.
     if (celebrate && hash === '#/resumen/' + celebrate) {
-      if ($app.querySelector('.new-medal, .week-done')) setTimeout(() => confetti(), 700);
+      if ($app.querySelector('.new-medal, .week-done, .ch-event')) setTimeout(() => confetti(), 700);
       celebrate = null;
     }
   }
@@ -2171,6 +2337,25 @@
       w.coreAsked = true; save(); render(true); toast('Core añadido al final 🎯');
     },
     'skip-core': () => { S().activeWorkout.coreAsked = true; save(); render(true); },
+    'ch-add': () => {
+      const w = S().activeWorkout, c = chActive();
+      chItems(c).filter(x => !excluded().includes(x.exId)).forEach(x => w.exercises.push(Object.assign(newWorkoutEx(x.exId, x.target, { note: x.note }), { ch: c.id })));
+      w.chAsked = true; save(); render(true); toast(`Reto añadido al final ${CHALLENGES[c.id].icon}`);
+    },
+    'ch-skip': () => { S().activeWorkout.chAsked = true; save(); render(true); },
+    'ch-start': el => {
+      const id = el.dataset.id, C = CHALLENGES[id], cur = chActive();
+      if (cur && !confirm(`Ya tienes el reto «${CHALLENGES[cur.id].name}». ¿Lo cambias por este? Lo que llevas no se guarda.`)) return;
+      if (C.warn && !confirm(C.warn + '\n\n¿Empiezas el reto?')) return;
+      S().challenge = { id, start: Date.now(), phase: 0, phaseAt: Date.now(), target: C.target ? C.target() : {} };
+      save(); window.scrollTo(0, 0); render(); toast(`¡Reto en marcha! ${C.icon}`);
+    },
+    'ch-next': () => {
+      const c = chActive(), C = CHALLENGES[c.id];
+      if (C.phases[c.phase + 1]?.elbow && !confirm('La siguiente fase carga más el codo. ¿Seguro que la empiezas?')) return;
+      c.phase++; c.phaseAt = Date.now(); save(); render(true);
+    },
+    'ch-quit': () => { if (confirm('¿Abandonar el reto? Podrás empezarlo de nuevo cuando quieras.')) { S().challenge = null; save(); render(true); } },
     'prep-go': el => {
       const w = S().activeWorkout, kind = el.dataset.k, steps = Prep.seq(Prep.plan(kind, prepRegion(w)));
       Timer.seq(steps, i => { guide = { kind, i: steps[i].src }; render(true); },
@@ -2210,6 +2395,7 @@
       w.end = w.past ? w.start + w.past * 60000 : Date.now();
       delete w.past;
       S().workouts.push(w); S().activeWorkout = null;
+      const ev = chUpdate(); if (ev) w.chEvent = ev;
       Object.assign(Hiit, { idx: -1, running: false }); clearInterval(Hiit.int);
       celebrate = w.id;
       save(); Timer.stop(); go('#/resumen/' + w.id);

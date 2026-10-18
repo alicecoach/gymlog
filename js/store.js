@@ -19,6 +19,8 @@ const Store = (() => {
     cycle: { enabled: false, starts: [], hormonal: false, irregular: false, share: false }, // seguimiento opcional del ciclo
     measures: [],             // { d: 'AAAA-MM-DD', waist, weight, hip, thigh } (cm / kg; lo que se rellene)
     activities: [],           // fuera del gym: { id, type, name, start, mins, effort 1–3, km, kcal, note }
+    challenge: null,          // reto activo: { id, start, phase, phaseAt, target }
+    challengesDone: [],       // retos conseguidos: { id, start, at, goal }
   });
   let users = null;           // { current, list: [{ id, name, avatar }] }
   let state = null;

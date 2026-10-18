@@ -26,6 +26,7 @@ const PATTERNS = {
   balance: 'Equilibrio',
   cardio: 'Cardio / HIIT',
   mobility: 'Movilidad',
+  grip: 'Colgarse y agarre',
 };
 
 const MUSCLES = ['Pecho', 'Dorsal', 'Espalda alta', 'Hombro', 'Hombro posterior', 'Bíceps', 'Tríceps',
@@ -209,6 +210,10 @@ const MACHINES = (() => {
   G('g-dips', 'Fondos en paralelas', 'press_horizontal', 'bodyweight', ['Pecho', 'Tríceps'], ['Hombro']);
   G('g-cable-fly', 'Cruce de poleas', 'fly', 'cable', ['Pecho']);
   G('g-pullup', 'Dominadas', 'pull_vertical', 'bodyweight', ['Dorsal'], ['Bíceps', 'Espalda alta']);
+  G('g-negative-pullup', 'Dominada negativa (bajada lenta)', 'pull_vertical', 'bodyweight', ['Dorsal'], ['Bíceps', 'Espalda alta'], { like: ['g-pullup'] });
+  G('g-dead-hang', 'Colgarse de la barra (dead hang)', 'grip', 'hold', [], ['Dorsal', 'Espalda alta']);
+  G('g-scap-pullup', 'Retracción escapular colgada', 'grip', 'bodyweight', ['Espalda alta'], ['Dorsal']);
+  G('g-flexed-hang', 'Aguantar arriba en la barra', 'grip', 'hold', ['Dorsal'], ['Bíceps', 'Espalda alta']);
   G('g-cable-row', 'Remo en polea baja', 'row', 'cable', ['Espalda alta'], ['Dorsal', 'Bíceps']);
   G('g-db-row', 'Remo con mancuerna', 'row', 'dumbbell', ['Dorsal'], ['Espalda alta', 'Bíceps'], { unilateral: true });
   G('g-face-pull', 'Face pull en polea', 'rear_delt', 'cable', ['Hombro posterior'], ['Espalda alta']);
