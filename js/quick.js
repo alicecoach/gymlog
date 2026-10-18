@@ -177,11 +177,11 @@ const Quick = (() => {
   }
 
   // Series y descanso de cada ejercicio según el tiempo disponible; segundos que cuesta (series + cambio).
-  function targetIn(ex, mins) {
+  function targetIn(ex, mins, coreOnly) {
     const goal = Store.get().profile?.goal, level = Store.get().profile?.level;
     const sets = mins >= 45 ? 3 : 2;
     const t = Object.assign(Generator.targetFor(ex, goal, level), { sets, rest: ex.compound ? (mins >= 60 ? 120 : 90) : 60 });
-    if (ex.pattern === 'core') Object.assign(t, { sets: mins <= 20 ? 3 : 2, repMin: 10, repMax: 15, rir: 2, rest: 40, secs: 30 });
+    if (ex.pattern === 'core') Object.assign(t, { sets: coreOnly || mins <= 20 ? 3 : 2, repMin: 10, repMax: 15, rir: 2, rest: 40, secs: 30 });
     const work = (ex.unilateral ? 1.7 : 1) * 30;
     return [t, t.sets * (work + t.rest) + 45];
   }
@@ -201,7 +201,7 @@ const Quick = (() => {
         if (n >= max) break;
         const ex = pickFor(slot, loads, avoid, seed);
         if (!ex) continue;
-        const [target, cost] = targetIn(ex, mins);
+        const [target, cost] = targetIn(ex, mins, !zones.length);
         if (used + cost > limit && picked.length) continue;
         avoid.push(ex.id); used += cost; n++;
         picked.push({ exId: ex.id, target, ref: refKg(ex.id) });

@@ -298,9 +298,11 @@
   }
 
   // «Diséñalo tú»: la última combinación elegida se recuerda en el perfil.
+  // Una zona y, si no es core, la opción de cerrar con core.
   function qcOpts() {
-    const o = Object.assign({ mins: 30, focus: ['full'], gear: ['maquinas', 'libres', 'polea', 'cuerpo'] }, S().settings.quickCustom);
-    return Object.assign(o, { seed: ui.qcSeed || 0 });
+    const o = Object.assign({ mins: 30, zone: 'full', addCore: false, gear: ['maquinas', 'libres', 'polea', 'cuerpo'] }, S().settings.quickCustom);
+    if (o.focus) { o.zone = o.focus.find(f => f !== 'core') || 'core'; o.addCore = o.zone !== 'core' && o.focus.includes('core'); delete o.focus; }
+    return Object.assign(o, { focus: o.addCore && o.zone !== 'core' ? [o.zone, 'core'] : [o.zone], seed: ui.qcSeed || 0 });
   }
   const qcTitle = o => `${o.focus.map(f => Quick.FOCUS[f].label).join(' + ')} · ${o.mins} min`;
   // Músculos trabajados ayer y hoy, para no repetirlos sin querer en el día extra.
@@ -317,7 +319,8 @@
     let h = `<div class="card"><h2>🎛️ Diseña tu entreno</h2>
       <p class="muted small">Para un día extra o distinto: no cambia tu rutina ni el día que te toca, pero cuenta para tu racha e historial.</p>
       <h3 class="qc-h">Tiempo</h3><div class="chips wrap">${Quick.MINUTES.map(m => chip('mins', m, `${m} min`, o.mins === m)).join('')}</div>
-      <h3 class="qc-h">¿Qué quieres trabajar?</h3><div class="chips wrap">${Object.entries(Quick.FOCUS).map(([k, f]) => chip('focus', k, f.label, o.focus.includes(k))).join('')}</div>
+      <h3 class="qc-h">¿Qué quieres trabajar?</h3><div class="chips wrap">${Object.entries(Quick.FOCUS).map(([k, f]) => chip('zone', k, f.label, o.zone === k)).join('')}</div>
+      ${o.zone !== 'core' ? `<label class="check-row"><input type="checkbox" data-act="qc-set" data-k="addCore" ${o.addCore ? 'checked' : ''}> Cerrar con core</label>` : ''}
       ${recent.length ? `<p class="muted small">Ayer y hoy ya has trabajado: ${recent.map(esc).join(', ')}.</p>` : ''}
       <h3 class="qc-h">Material</h3><div class="chips wrap">${Object.entries(Quick.GEAR).map(([k, g]) => chip('gear', k, g.label, o.gear.includes(k))).join('')}</div></div>`;
     h += `<div class="section-head"><h2>Tu entreno</h2><small>≈ ${plan.mins} min</small></div>`;
@@ -2022,12 +2025,14 @@
     'qc-set': el => {
       const o = qcOpts(), k = el.dataset.k, v = el.dataset.v;
       if (k === 'mins') o.mins = Number(v);
+      else if (k === 'zone') o.zone = v;
+      else if (k === 'addCore') o.addCore = !o.addCore;
       else {
         const list = o[k].includes(v) ? o[k].filter(x => x !== v) : o[k].concat(v);
-        if (!list.length) return toast(k === 'focus' ? 'Elige al menos una zona.' : 'Elige al menos un material.');
+        if (!list.length) return toast('Elige al menos un material.');
         o[k] = list;
       }
-      delete o.seed; ui.qcSeed = 0; S().settings.quickCustom = o; save(); render(true);
+      delete o.seed; delete o.focus; ui.qcSeed = 0; S().settings.quickCustom = o; save(); render(true);
     },
     'qc-seed': () => { ui.qcSeed = (ui.qcSeed || 0) + 1; render(true); },
     generate: () => {
