@@ -29,6 +29,10 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 15, date: '2026-10-18', items: [
+      '🎯 <b>Core exprés</b> en Entreno rápido: 5 ejercicios de core en ~15 min, distintos cada vez.',
+      '🎛️ <b>Diséñalo tú</b>: eliges tiempo, qué quieres trabajar y el material que tienes, y la app te monta el entreno. Ideal para un día extra: no cambia tu rutina ni el día que te toca.',
+    ] },
     { v: 14, date: '2026-10-15', items: [
       '📊 <b>Informe de fin de bloque</b> (en Historial): ejercicio a ejercicio, qué sube, qué se ha estancado y cuál conviene cambiar, tu constancia y las series reales por músculo. En la semana 4 te avisa en Inicio para que lo mires antes de la descarga.',
       '📋 Lo puedes copiar en texto para preparar el próximo bloque con tu asistente de IA.',
@@ -122,7 +126,8 @@
     ['📖', 'Cómo se hace', 'Toca «📖 Cómo se hace» en el entreno o abre la ficha del ejercicio: los pasos de la técnica y, en muchos, una ilustración animada.'],
     ['🏃', 'Fuera del gym', 'Correr, pádel, bici, yoga…: regístralo desde Inicio → «Fuera del gym». Sale en tu historial y en el resumen del mes, pero no cuenta para la racha de entrenos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
-    ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, o una descarga.'],
+    ['⚡', 'Entrenos rápidos', 'Para días raros: full body, full body sin material (calistenia), HIIT, potencia, movilidad y Animal Flow, Core exprés o una descarga.'],
+    ['🎛️', 'Diséñalo tú', 'En Entreno rápido: elige tiempo, zona y material y te monta un entreno. Para un día extra: no cambia tu rutina ni el día que te toca.'],
     ['📅', '¿Se te olvidó anotar?', 'Historial → «📅 Entreno pasado». Desde cada resumen puedes corregir pesos y fechas.'],
     ['📊', 'Informe del bloque', 'En Historial: cómo va cada ejercicio desde tu última descarga y cuáles conviene cambiar. Tras una descarga empieza un bloque nuevo.'],
     ['💪', 'Mira tu volumen','En Historial: series por músculo de la semana y el progreso de cada grupo muscular.'],
@@ -134,12 +139,7 @@
   ];
 
   // Remate de core: uno de cada tipo (flexión / anti-extensión, rotación / anti-rotación, lateral), rotando entre entrenos.
-  // Respeta los ejercicios que cada perfil marca como ⛔ Evitar (p. ej. planchas sobre antebrazos).
-  const CORE = [
-    ['g-dead-bug', 'g-cable-crunch', 'g-reverse-crunch', 'g-weighted-situp', 'g-high-plank', 'hss-ab-crunch', 'g-hollow', 'g-plank', 'af-beast-hold', 'g-bird-dog'],
-    ['g-pallof', 'g-russian-twist', 'g-cable-woodchop', 'g-bicycle', 'g-cable-pallof', 'af-side-kick'],
-    ['g-kb-side-bend', 'g-side-plank-hand', 'g-suitcase-carry', 'g-side-plank', 'g-heel-touch', 'g-db-side-bend'],
-  ];
+  const CORE = Quick.CORE;
 
   // ---------- helpers de datos ----------
   const activeRoutine = () => S().routines.find(r => r.id === S().activeRoutineId) || null;
@@ -275,12 +275,16 @@
     go('#/elegir/workout/0');
   }
   function startQuick(type) {
+    if (type === 'custom' && location.hash !== '#/rapido') return go('#/rapido');
     const r = activeRoutine(), next = r ? nextDayIndex(r) : 0, T = Quick.TYPES[type];
     if (type === 'descarga' && !r) return toast('Para la descarga necesitas una rutina activa.');
+    const plan = type === 'custom' && Quick.custom(qcOpts());
+    if (plan && !plan.items.length) return toast('Con ese material no hay ejercicios para esa zona. Añade algún material más.');
     if (!confirmReplace()) return;
-    const items = Quick.build(type, r, next);
+    const items = plan ? plan.items : Quick.build(type, r, next);
     const w = { id: Store.uid(), type, icon: T.icon, dayName: T.label, start: Date.now(), exercises: [] };
     if (type === 'descarga') Object.assign(w, { routineId: r.id, dayIndex: next, dayName: `Descarga · ${r.days[next].name}` });
+    if (plan) Object.assign(w, { dayName: qcTitle(qcOpts()), noPrep: plan.noPrep });
     if (type === 'hiit') {
       w.hiit = Object.assign({}, Quick.HIIT);
       w.exercises = items.map(it => ({ exId: it.exId, target: it.target, note: it.ref.note || '',
@@ -291,6 +295,41 @@
     S().activeWorkout = w;
     save();
     go('#/entreno');
+  }
+
+  // «Diséñalo tú»: la última combinación elegida se recuerda en el perfil.
+  function qcOpts() {
+    const o = Object.assign({ mins: 30, focus: ['full'], gear: ['maquinas', 'libres', 'polea', 'cuerpo'] }, S().settings.quickCustom);
+    return Object.assign(o, { seed: ui.qcSeed || 0 });
+  }
+  const qcTitle = o => `${o.focus.map(f => Quick.FOCUS[f].label).join(' + ')} · ${o.mins} min`;
+  // Músculos trabajados ayer y hoy, para no repetirlos sin querer en el día extra.
+  function recentMuscles() {
+    const m = new Set();
+    S().workouts.filter(w => daysAgo(w.start) <= 1).forEach(w => w.exercises.forEach(e => {
+      if (e.sets.some(s => s.done !== false)) Store.exercise(e.exId).primary.forEach(x => m.add(x));
+    }));
+    return [...m];
+  }
+  function viewCustom() {
+    const o = qcOpts(), plan = Quick.custom(o), recent = recentMuscles();
+    const chip = (k, v, label, on) => `<button class="chip ${on ? 'on' : ''}" data-act="qc-set" data-k="${k}" data-v="${v}">${label}</button>`;
+    let h = `<div class="card"><h2>🎛️ Diseña tu entreno</h2>
+      <p class="muted small">Para un día extra o distinto: no cambia tu rutina ni el día que te toca, pero cuenta para tu racha e historial.</p>
+      <h3 class="qc-h">Tiempo</h3><div class="chips wrap">${Quick.MINUTES.map(m => chip('mins', m, `${m} min`, o.mins === m)).join('')}</div>
+      <h3 class="qc-h">¿Qué quieres trabajar?</h3><div class="chips wrap">${Object.entries(Quick.FOCUS).map(([k, f]) => chip('focus', k, f.label, o.focus.includes(k))).join('')}</div>
+      ${recent.length ? `<p class="muted small">Ayer y hoy ya has trabajado: ${recent.map(esc).join(', ')}.</p>` : ''}
+      <h3 class="qc-h">Material</h3><div class="chips wrap">${Object.entries(Quick.GEAR).map(([k, g]) => chip('gear', k, g.label, o.gear.includes(k))).join('')}</div></div>`;
+    h += `<div class="section-head"><h2>Tu entreno</h2><small>≈ ${plan.mins} min</small></div>`;
+    if (!plan.items.length) return h + `<div class="card warn"><p>Con ese material no hay ejercicios para esa zona. Añade algún material más.</p></div>`;
+    h += plan.items.map(it => {
+      const ex = Store.exercise(it.exId), t = it.target, hold = Store.exSettings(it.exId).mode === 'tiempo';
+      return `<div class="card row qc-ex">${thumb(it.exId, 'sm')}<div class="grow"><b>${esc(ex.name)}</b>
+        <small>${t.sets} × ${hold ? `${t.secs} s` : `${t.repMin}–${t.repMax}`}${ex.unilateral ? ' por lado' : ''} · descanso ${fmtRest(t.rest)}</small></div></div>`;
+    }).join('');
+    return h + `<div class="row gap qc-go"><button class="btn ghost" data-act="qc-seed">🔀 Otra propuesta</button>
+      <button class="btn primary grow" data-act="quick" data-type="custom">▶ Empezar</button></div>
+      <p class="muted small center">Durante el entreno puedes cambiar cualquier ejercicio con ⇄.</p>`;
   }
 
   // ---------- vistas ----------
@@ -1191,7 +1230,7 @@
   // ---------- calentamiento y estiramientos (opcionales) ----------
   let guide = null; // { kind, i }: paso en marcha del modo guiado
   const prepRegion = w => regionOf(w.exercises.map(e => [e.exId, e.sets.length])) || 'full';
-  const prepOn = w => S().settings.prep !== false && !w.past && !['hiit', 'movilidad'].includes(w.type);
+  const prepOn = w => S().settings.prep !== false && !w.past && !w.noPrep && !['hiit', 'movilidad', 'core'].includes(w.type);
   function prepCard(w, kind) {
     const st = w.prep?.[kind], K = Prep.KINDS[kind], region = prepRegion(w), items = Prep.plan(kind, region), run = guide?.kind === kind;
     if (st === 'skip') return '';
@@ -1232,7 +1271,7 @@
     if (prepOn(w) && (!started || w.prep?.warm === 'done' || guide?.kind === 'warm')) h += prepCard(w, 'warm');
     w.exercises.forEach((e, ei) => { h += exerciseCard(e, ei); });
     const hasCore = w.exercises.some(e => Store.exercise(e.exId).pattern === 'core');
-    if (!hasCore && !w.coreAsked && ['rutina', 'fullbody', 'pierna', 'torso'].includes(w.type || 'rutina')) {
+    if (!hasCore && !w.coreAsked && ['rutina', 'fullbody', 'pierna', 'torso', 'custom'].includes(w.type || 'rutina')) {
       h += `<div class="card core-offer">${Icons.body(['Abdomen'], [], 'sm')}<div class="grow"><b>¿Cierras con core?</b>
         <small>3 ejercicios · ~6 min</small></div>
         <div class="row gap"><button class="btn small primary" data-act="add-core">Añadir</button><button class="btn small ghost" data-act="skip-core">Hoy no</button></div></div>`;
@@ -1784,6 +1823,7 @@
     [/^#\/nuevo-ejercicio$/, viewNewExercise, 'ejercicios', 'Nueva máquina'],
     [/^#\/historial$/, viewHistory, 'historial', 'Historial'],
     [/^#\/pasado$/, viewPast, 'historial', 'Entreno pasado'],
+    [/^#\/rapido$/, viewCustom, 'home', 'Diséñalo tú'],
     [/^#\/editar\/(\w+)$/, viewEditWorkout, 'historial', 'Corregir entreno'],
     [/^#\/ajustes$/, viewSettings, '', 'Ajustes'],
     [/^#\/ciclo$/, viewCycle, 'home', 'Mi ciclo'],
@@ -1979,6 +2019,17 @@
       w.exercises.splice(Number(el.dataset.ei), 1); save(); render(true);
     },
     quick: el => startQuick(el.dataset.type),
+    'qc-set': el => {
+      const o = qcOpts(), k = el.dataset.k, v = el.dataset.v;
+      if (k === 'mins') o.mins = Number(v);
+      else {
+        const list = o[k].includes(v) ? o[k].filter(x => x !== v) : o[k].concat(v);
+        if (!list.length) return toast(k === 'focus' ? 'Elige al menos una zona.' : 'Elige al menos un material.');
+        o[k] = list;
+      }
+      delete o.seed; ui.qcSeed = 0; S().settings.quickCustom = o; save(); render(true);
+    },
+    'qc-seed': () => { ui.qcSeed = (ui.qcSeed || 0) + 1; render(true); },
     generate: () => {
       const brands = [...document.querySelectorAll('.g-brand:checked')].map(i => i.value);
       if (!brands.length) return toast('Elige al menos un tipo de material.');

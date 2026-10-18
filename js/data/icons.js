@@ -109,7 +109,7 @@ const Icons = (() => {
     '📷': 'camera', '⚖️': 'scale', '⛔': 'ban', '✅': 'circle-check', '🎯': 'target', '🛟': 'life-buoy', '👥': 'users',
     '📲': 'smartphone', '🔥': 'flame', '⚡': 'zap', '💪': 'biceps-flexed', '🍽️': 'utensils', '🏆': 'trophy',
     '🐾': 'paw-print', '🧗': 'mountain', '🫀': 'heart-pulse', '⭐': 'star', '🎉': 'party-popper', '🏅': 'medal',
-    '⏭': 'skip-forward', '▶': 'play', '🌱': 'sprout', '🌡️': 'thermometer',
+    '⏭': 'skip-forward', '▶': 'play', '🌱': 'sprout', '🌡️': 'thermometer', '🎛️': 'sliders-horizontal', '🔀': 'shuffle',
     '🦵': 'footprints', '🤸': 'rocket', '🧘': 'wind',
     '🏃': 'footprints', '🥾': 'mountain', '🚴': 'bike', '🏊': 'waves', '🎾': 'volleyball', '🏸': 'volleyball', '⚽': 'goal',
     '👯': 'users', '💃': 'music', '🍃': 'signal-low', '💨': 'signal-medium', '🌋': 'signal-high',

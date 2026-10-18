@@ -8,8 +8,39 @@ const Quick = (() => {
     pierna: { icon: '🦵', label: 'Solo pierna', desc: 'Cuádriceps, glúteo y femoral', grad: 'legs' },
     potencia: { icon: '🤸', label: 'Potencia y equilibrio', desc: 'Explosividad y estabilidad', grad: 'glute' },
     movilidad: { icon: '🐾', label: 'Movilidad y Animal Flow', desc: 'Sin material · ~20 min', grad: 'core' },
+    core: { icon: '🎯', label: 'Core exprés', desc: '5 ejercicios · ~15 min', grad: 'core' },
+    custom: { icon: '🎛️', label: 'Diséñalo tú', desc: 'Tiempo, zona y material', grad: 'push' },
     descarga: { icon: '🔋', label: 'Descarga', desc: 'Tu próximo día, suave', grad: 'core' },
   };
+
+  // Core por tipos: flexión / anti-extensión, rotación / anti-rotación, lateral.
+  // Lo usan el remate de core, el Core exprés y «Diséñalo tú». Respeta ⛔ Evitar de cada perfil.
+  const CORE = [
+    ['g-dead-bug', 'g-cable-crunch', 'g-reverse-crunch', 'g-weighted-situp', 'g-high-plank', 'hss-ab-crunch', 'g-hollow', 'g-plank', 'af-beast-hold', 'g-bird-dog',
+      'g-ab-wheel', 'g-captain-chair', 'g-shoulder-tap', 'g-stir-pot', 'g-plank-saw'],
+    ['g-pallof', 'g-russian-twist', 'g-cable-woodchop', 'g-bicycle', 'g-cable-pallof', 'af-side-kick', 'g-db-woodchop', 'hs-combo-twist'],
+    ['g-kb-side-bend', 'g-side-plank-hand', 'g-suitcase-carry', 'g-side-plank', 'g-heel-touch', 'g-db-side-bend', 'g-side-plank-dip', 'g-farmer-carry'],
+  ];
+
+  // «Diséñalo tú»: qué trabajar (huecos por patrón; «patrón:Músculo» = ese músculo como principal) y material.
+  const FOCUS = {
+    full: { label: 'Todo el cuerpo', slots: ['squat', 'press_horizontal', 'row', 'hinge', 'pull_vertical', 'press_vertical', 'knee_flex', 'lateral_raise', 'hinge:Glúteo', 'biceps', 'triceps', 'calf'] },
+    torso: { label: 'Tren superior', slots: ['press_horizontal', 'row', 'press_vertical', 'pull_vertical', 'lateral_raise', 'rear_delt', 'biceps', 'triceps', 'press_incline', 'fly'] },
+    pierna: { label: 'Pierna', slots: ['squat', 'hinge', 'knee_flex', 'knee_ext', 'squat', 'abduction', 'calf', 'hinge:Glúteo', 'adduction'] },
+    gluteo: { label: 'Glúteo', slots: ['hinge:Glúteo', 'squat', 'abduction', 'hinge', 'hinge:Glúteo', 'abduction', 'squat'] },
+    espalda: { label: 'Espalda', slots: ['pull_vertical', 'row', 'rear_delt', 'row', 'pull_vertical', 'biceps'] },
+    pecho: { label: 'Pecho y hombro', slots: ['press_horizontal', 'press_vertical', 'lateral_raise', 'press_incline', 'fly', 'rear_delt', 'triceps'] },
+    brazos: { label: 'Brazos', slots: ['biceps', 'triceps', 'biceps', 'triceps', 'biceps', 'triceps'] },
+    core: { label: 'Core', slots: ['core:0', 'core:1', 'core:2', 'core:0', 'core:1', 'core:2'] },
+  };
+  const GEAR = {
+    maquinas: { label: 'Máquinas', loads: ['plates', 'stack'] },
+    libres: { label: 'Peso libre', loads: ['dumbbell', 'barbell', 'implement'] },
+    polea: { label: 'Poleas', loads: ['cable'] },
+    gomas: { label: 'Gomas', loads: ['band'] },
+    cuerpo: { label: 'Sin material', loads: ['bodyweight', 'hold'] },
+  };
+  const MINUTES = [15, 20, 30, 45, 60];
 
   const excluded = () => Store.get().profile?.excluded || [];
   const brands = () => Store.get().profile?.brands || Generator.BRANDS;
@@ -101,6 +132,13 @@ const Quick = (() => {
           ['g-rower', 4, 0, 0, 0, 0, 'Empuja con piernas, luego tira.'],
           ['g-mountain-climber', 4, 0, 0, 0, 0, 'Manos bajo los hombros, brazos estirados (sin apoyar codos).'],
         ]);
+      case 'core':
+        // Un ejercicio de cada tipo y otra vuelta a los dos primeros; cambian de un entreno de core a otro.
+        return ['core:0', 'core:1', 'core:2', 'core:0', 'core:1'].reduce((out, slot, i) => {
+          const ex = pickFor(slot, null, out.map(x => x.exId), 0);
+          if (ex) out.push({ exId: ex.id, target: { sets: i < 3 ? 3 : 2, repMin: 10, repMax: 15, rir: 2, rest: 40, secs: 30 }, ref: { note: ex.unilateral ? 'Por lado.' : '' } });
+          return out;
+        }, []);
       case 'descarga': {
         if (!routine) return [];
         // Mismo peso, mitad de series y lejos del fallo (RIR 3–4).
@@ -116,7 +154,68 @@ const Quick = (() => {
     return [];
   }
 
+  // Candidatos de un hueco, los que ya haces primero (con historial, luego los de tus rutinas).
+  // `seed` rota entre los candidatos para «Otra propuesta»; el core rota además entre entrenos.
+  function candidates(slot, loads) {
+    const okLoad = e => !loads || loads.includes(e.load);
+    const [pattern, arg] = slot.split(':');
+    if (pattern === 'core') {
+      const ok = id => { const e = Store.exercise(id); return !excluded().includes(id) && okLoad(e) && (e.custom || brands().includes(e.brand)); };
+      const list = CORE[arg].filter(ok);
+      return list.length ? list.map(Store.exercise) : Generator.poolFor('core', brands()).filter(okLoad);
+    }
+    const familiar = new Set(Store.get().routines.flatMap(r => r.days.flatMap(d => d.exercises.map(x => x.exId))));
+    const rank = e => (Progression.historyFor(e.id).length ? 2 : 0) + (familiar.has(e.id) ? 1 : 0);
+    return Generator.poolFor(pattern, brands()).filter(e => okLoad(e) && (!arg || e.primary.includes(arg)))
+      .map((e, i) => [e, rank(e), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(([e]) => e);
+  }
+  function pickFor(slot, loads, avoid, seed) {
+    const pool = candidates(slot, loads).filter(e => !avoid.includes(e.id));
+    if (!pool.length) return null;
+    const rot = slot.startsWith('core') ? Store.get().workouts.filter(w => ['core', 'custom'].includes(w.type)).length : 0;
+    return pool[(seed + rot) % pool.length];
+  }
+
+  // Series y descanso de cada ejercicio según el tiempo disponible; segundos que cuesta (series + cambio).
+  function targetIn(ex, mins) {
+    const goal = Store.get().profile?.goal, level = Store.get().profile?.level;
+    const sets = mins >= 45 ? 3 : 2;
+    const t = Object.assign(Generator.targetFor(ex, goal, level), { sets, rest: ex.compound ? (mins >= 60 ? 120 : 90) : 60 });
+    if (ex.pattern === 'core') Object.assign(t, { sets: mins <= 20 ? 3 : 2, repMin: 10, repMax: 15, rir: 2, rest: 40, secs: 30 });
+    const work = (ex.unilateral ? 1.7 : 1) * 30;
+    return [t, t.sets * (work + t.rest) + 45];
+  }
+
+  // Entreno a medida: reparte el tiempo entre las zonas elegidas; el core siempre al final.
+  function custom({ mins = 30, focus = ['full'], gear = Object.keys(GEAR), seed = 0 }) {
+    const loads = gear.flatMap(g => GEAR[g]?.loads || []);
+    const zones = focus.filter(f => FOCUS[f] && f !== 'core'), withCore = focus.includes('core');
+    // Huecos intercalados: uno de cada zona por turno.
+    const main = [];
+    for (let i = 0; zones.some(z => i < FOCUS[z].slots.length); i++) zones.forEach(z => FOCUS[z].slots[i] && main.push(FOCUS[z].slots[i]));
+    const budget = mins * 60, avoid = [], picked = [];
+    let used = 0;
+    const fill = (slots, limit, max = Infinity) => {
+      let n = 0;
+      for (const slot of slots) {
+        if (n >= max) break;
+        const ex = pickFor(slot, loads, avoid, seed);
+        if (!ex) continue;
+        const [target, cost] = targetIn(ex, mins);
+        if (used + cost > limit && picked.length) continue;
+        avoid.push(ex.id); used += cost; n++;
+        picked.push({ exId: ex.id, target, ref: refKg(ex.id) });
+      }
+    };
+    // Con core y otra zona: el core se queda ~1/4 del tiempo (mínimo 2 ejercicios).
+    fill(main, withCore && zones.length ? budget * .75 : budget);
+    // Los básicos (multiarticulares) primero, con energía; el orden entre ellos se mantiene.
+    picked.sort((a, b) => !!Store.exercise(b.exId).compound - !!Store.exercise(a.exId).compound);
+    if (withCore) fill(FOCUS.core.slots.concat(FOCUS.core.slots), budget, zones.length ? Math.max(2, Math.round(mins / 15)) : Infinity);
+    return { items: picked, mins: Math.round(used / 60), noPrep: !zones.length };
+  }
+
   const HIIT = { work: 40, rest: 20, rounds: 4 };
 
-  return { TYPES, build, HIIT };
+  return { TYPES, FOCUS, GEAR, MINUTES, CORE, build, custom, HIIT };
 })();
