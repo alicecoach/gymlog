@@ -29,6 +29,11 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 17, date: '2026-10-21', items: [
+      '⚖️ <b>Peso total debajo de cada serie</b>: anota los discos de cada lado (o el peso de una mancuerna) y la app te enseña el total, con el peso de la máquina incluido. En búlgaras, zancadas y step-ups, el peso por pierna.',
+      '🏋️ La primera vez en cada máquina de discos te pregunta cuánto pesa sin discos (si lo dejas vacío, cuenta 0). Si en una anotabas el total, puedes pasarla a «por lado» y la app convierte lo que ya tenías anotado.',
+      '🏁 <b>«Terminar» ahora está abajo del todo</b>, al acabar el último ejercicio, y «Descartar» arriba.',
+    ] },
     { v: 16, date: '2026-10-18', items: [
       '🎯 <b>Retos</b> (en Logros): tu primera dominada por fases, colgarte un minuto, hip thrust con el doble de tu peso, paseo del granjero, plancha lateral y 8 semanas cumpliendo.',
       '📏 El objetivo se calcula con tus datos, un paso por encima de donde estás. Si el reto lo necesita, te propone unos minutos al final de algunos entrenos.',
@@ -123,10 +128,10 @@
     ['📈', 'Sigue la sugerencia', 'Doble progresión: cuando llegas al tope de reps en todas las series, toca subir peso. Si te estancas, te avisa.'],
     ['🎯', 'Anota el RIR', 'Las reps que te quedaban en la recámara. Con él las sugerencias se ajustan mejor a ti.'],
     ['⇄', '¿Máquina ocupada?', 'Toca ⇄ en el ejercicio: alternativas que trabajan lo mismo, solo para hoy.'],
-    ['⇅', 'Otro orden hoy', 'Toca ⇅ junto a «Terminar» para subir o bajar ejercicios del entreno. Solo para hoy: la rutina no cambia.'],
+    ['⇅', 'Otro orden hoy', 'Toca ⇅ arriba del entreno, junto a «Descartar», para subir o bajar ejercicios del entreno. Solo para hoy: la rutina no cambia.'],
     ['✨', 'Generar una rutina', 'En Rutinas → «Generar rutina», según tu objetivo, días y máquinas. Puedes generar otra cuando quieras.'],
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
-    ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima de esa máquina.'],
+    ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, el peso de la máquina sin discos y la subida mínima. Debajo de cada serie ves el peso total.'],
     ['📖', 'Cómo se hace', 'Toca «📖 Cómo se hace» en el entreno o abre la ficha del ejercicio: los pasos de la técnica y, en muchos, una ilustración animada.'],
     ['🏃', 'Fuera del gym', 'Correr, pádel, bici, yoga…: regístralo desde Inicio → «Fuera del gym». Sale en tu historial y en el resumen del mes, pero no cuenta para la racha de entrenos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
@@ -556,8 +561,8 @@
   const since = (exId, t) => Progression.historyFor(exId).filter(h => h.date >= t);
   const bestSecs = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.secs) || 0)));
   const bestReps = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.reps) || 0)));
-  // Kilos reales: en las máquinas de discos se anota por lado.
-  const realKg = (exId, kg) => (Number(kg) || 0) * (Store.exSettings(exId).mode === 'lado' ? 2 : 1);
+  // Kilos reales: en las máquinas de discos se anota por lado (se suman los dos lados y la máquina).
+  const realKg = (exId, kg) => Store.exSettings(exId).mode === 'lado' ? Store.realKg(exId, kg) : Number(kg) || 0;
   const bestKg = (exId, reps, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.filter(s => Number(s.reps) >= reps).map(s => realKg(exId, s.kg))));
   const HIP_THRUSTS = ['g-hip-thrust', 'hs-glute-drive', 'g-hip-thrust-machine', 'mm-hip-thrust', 'g-db-hip-thrust'];
   const firstOk = ids => ids.find(id => !excluded().includes(id)) || ids[0];
@@ -1303,8 +1308,10 @@
       ${hasHowto(id) ? `<div class="card demo-card"><h3>📖 Cómo se hace</h3>${howtoHTML(id)}</div>` : ''}
       <div class="card"><h3>Carga</h3><div class="rx-fields two">
         <label>Cómo anoto el peso<select data-exs="mode" data-id="${id}">${Object.entries(Store.MODES).map(([k, v]) => `<option value="${k}" ${st.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-        ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}</div>
-        <p class="muted small">${st.mode === 'goma' ? `Anotas el color de la goma. Orden de suave a dura: ${Object.values(BANDS).map(b => b.dot + ' ' + b.label.toLowerCase()).join(' → ')} (puede variar según la marca).`
+        ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}
+        ${st.mode === 'lado' ? `<label>Máquina sin discos (kg)<input type="number" step="any" inputmode="decimal" data-exs="machine" data-id="${id}" value="${esc(st.machine ?? '')}" placeholder="0"></label>` : ''}</div>
+        ${ui.conv?.id === id ? convCard(id, st, hist.length) : ''}
+        <p class="muted small">${st.mode === 'lado' ? 'Anotas los discos de un lado; debajo de cada serie ves el total con los dos lados y la máquina. ' : ''}${st.mode === 'goma' ? `Anotas el color de la goma. Orden de suave a dura: ${Object.values(BANDS).map(b => b.dot + ' ' + b.label.toLowerCase()).join(' → ')} (puede variar según la marca).`
           : st.mode === 'tiempo' ? 'Eliges los segundos de cada serie y la app hace la cuenta atrás.'
           : 'Ajusta la subida al salto real de la máquina (p. ej. 1,25 si tienes discos pequeños, o el salto entre placas).'}</p>
         ${Store.WARMUP_MODES.includes(st.mode) ? `<label class="check-row"><input type="checkbox" data-exs-wu data-id="${id}" ${st.warmup ? 'checked' : ''}> 🔥 Series de aproximación (50 % × 8 y 75 % × 4)</label>` : ''}</div>
@@ -1427,7 +1434,7 @@
     let h = `<div class="workout-head"><div class="day-ic">${workoutIcon(w)}</div><div class="grow"><h2>${esc(w.dayName)}</h2>
       <small>${w.past ? `📅 ${fmtDate(w.start)} · ${w.past} min` : `⏱ <span id="elapsed">${fmtDur(Date.now() - w.start)}</span>`}</small></div>
       ${w.exercises.length > 1 ? `<button class="icon order-btn ${orderOpen ? 'on' : ''}" data-act="order-open" title="Cambiar el orden">⇅</button>` : ''}
-      <button class="btn primary" data-act="finish">${w.past ? 'Guardar' : 'Terminar'}</button></div><div id="msg"></div>`;
+      <button class="btn small ghost danger" data-act="discard">Descartar</button></div>`;
     if (orderOpen) return h + orderPanel(w);
     if (w.past) h += `<div class="card past-note">📅 Estás anotando un entreno pasado: rellena lo que hiciste y marca ✓ cada serie. Sin descansos ni cronómetro.</div>`;
     const notes = routineById(w.routineId)?.notes;
@@ -1444,8 +1451,8 @@
     }
     if (chOffer(w)) h += chOfferCard(w);
     if (prepOn(w) && w.exercises.length) h += prepCard(w, 'cool');
-    h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a>
-      <button class="btn block ghost danger" data-act="discard">Descartar entreno</button>`;
+    h += `<a class="btn block ghost" href="#/elegir/workout/0">+ Añadir ejercicio</a><div id="msg"></div>
+      <button class="btn block primary finish-btn" data-act="finish">${w.past ? 'Guardar' : 'Terminar entreno'}</button>`;
     return h;
   }
 
@@ -1467,6 +1474,36 @@
         <div class="order-btns"><button class="icon" data-act="order-mv" data-bi="${bi}" data-dir="-1" ${bi ? '' : 'disabled'} aria-label="Subir">↑</button>
         <button class="icon" data-act="order-mv" data-bi="${bi}" data-dir="1" ${bi < blocks.length - 1 ? '' : 'disabled'} aria-label="Bajar">↓</button></div></div>`).join('')}
       <button class="btn primary block" data-act="order-open">Listo</button></div>`;
+  }
+
+  // Al cambiar entre «total» y «por lado» con historial: se convierte lo anotado para que el progreso siga cuadrando.
+  function convCard(id, st, n) {
+    const to = ui.conv.to, toLado = to === 'lado';
+    return `<div class="conv-card"><b>Convertir lo que ya has anotado</b>
+      <p class="small">Tienes ${n} ${n === 1 ? 'sesión anotada' : 'sesiones anotadas'} en ${st.label}. La app ${n === 1 ? 'la pasa' : 'las pasa'} a ${Store.MODES[to]} para que tu progreso siga cuadrando.</p>
+      <label>Máquina sin discos (kg)<input id="conv-m" type="number" step="any" inputmode="decimal" value="${esc(st.machine ?? '')}" placeholder="0"></label>
+      <p class="muted small">${toLado ? 'Ejemplo: 100 kg en total con una máquina de 20 kg → 40 kg/lado.' : 'Ejemplo: 40 kg/lado con una máquina de 20 kg → 100 kg en total.'} Si no lo sabes, déjalo vacío.</p>
+      <div class="row gap"><button class="btn small primary" data-act="conv-go" data-id="${id}">Cambiar y convertir</button>
+        <button class="btn small ghost" data-act="conv-no">Cancelar</button></div></div>`;
+  }
+
+  // Primera vez en una máquina de discos: cuánto pesa sin discos (vacío = 0) o, si anotabas el total, pasar a «por lado».
+  function machineAsk(e, ei, st) {
+    const inp = `<input id="ma-${ei}" type="number" step="any" inputmode="decimal" placeholder="0"><span>kg</span>`;
+    if (st.mode === 'lado') return `<div class="machine-ask"><p class="small">¿Cuánto pesa la máquina sin discos?</p>
+      <div class="ma-row">${inp}<button class="btn small" data-act="machine-ok" data-ei="${ei}">OK</button></div>
+      <small class="muted">Se suma al total de cada serie. Si no lo sabes, déjalo vacío: cuenta 0 y no vuelve a preguntar.</small></div>`;
+    return `<div class="machine-ask"><p class="small">Aquí anotas el total. ¿Prefieres anotar los discos de cada lado y que la app sume? Dime cuánto pesa la máquina sin discos:</p>
+      <div class="ma-row">${inp}<button class="btn small primary" data-act="machine-lado" data-ei="${ei}">Pasar a por lado</button></div>
+      <button class="btn small ghost" data-act="machine-keep" data-ei="${ei}">Seguir con el total</button>
+      <small class="muted">Lo que ya tienes anotado se convierte (p. ej. 100 kg con una máquina de 20 kg → 40 kg/lado).</small></div>`;
+  }
+  const askMachine = (e, st) => !S().activeWorkout?.past && Store.exercise(e.exId).load === 'plates' && st.machine === undefined && ['lado', 'total'].includes(st.mode);
+  const totTxt = (exId, kg) => { const t = Store.loadTotal(exId, kg); return t ? `= ${fmtNum(t.kg)} kg` : ''; };
+  // Tras cambiar el modo de anotar: la sugerencia del entreno en curso se recalcula con lo convertido.
+  function refreshSuggestions(id) {
+    (S().activeWorkout?.exercises || []).forEach(e => { if (e.exId === id && e.suggestion?.type !== 'deload') e.suggestion = Progression.suggest(id, e.target); });
+    save();
   }
 
   function swapPanel(e, ei) {
@@ -1526,7 +1563,9 @@
         : `<button class="demo-btn" data-act="demo-open" data-ei="${ei}">📖 Cómo se hace</button>`}
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>
       <div class="prev">Anterior: ${esc(prevTxt)}</div>${warm}
+      ${askMachine(e, st) ? machineAsk(e, ei, st) : ''}
       <table class="sets ${st.mode === 'tiempo' ? 'hold' : st.mode === 'goma' ? 'band' : ''}">${setRows(e, ei, st.mode)}</table>
+      ${Store.loadTotal(e.exId, 0) ? `<p class="tot-note">= ${esc(Store.loadTotal(e.exId, 0).note)}</p>` : ''}
       <div class="row gap"><button class="btn small ghost" data-act="add-set" data-ei="${ei}">+ Serie</button>
       <button class="btn small ghost" data-act="del-set" data-ei="${ei}">− Serie</button></div></section>`;
   }
@@ -1553,7 +1592,8 @@
     if (mode === 'goma') return `<thead><tr><th>#</th><th>Goma</th><th>Reps</th><th>RIR</th><th></th></tr></thead><tbody>` +
       e.sets.map((s, si) => row(s, si, `<td><select data-f="band" ${a(si)}>${bandOptions(s.band)}</select></td>${repsRir(s, si)}`)).join('') + '</tbody>';
     return `<thead><tr><th>#</th><th>${st.label}</th><th>Reps</th><th>RIR</th><th></th></tr></thead><tbody>` +
-      e.sets.map((s, si) => row(s, si, `<td><input type="number" inputmode="decimal" step="any" data-f="kg" ${a(si)} value="${esc(s.kg)}"></td>${repsRir(s, si)}`)).join('') + '</tbody>';
+      e.sets.map((s, si) => row(s, si, `<td><input type="number" inputmode="decimal" step="any" data-f="kg" ${a(si)} value="${esc(s.kg)}">${Store.loadTotal(e.exId, 0)
+        ? `<small class="tot" data-tot="${ei}-${si}">${totTxt(e.exId, s.kg)}</small>` : ''}</td>${repsRir(s, si)}`)).join('') + '</tbody>';
   }
 
   // ---------- HIIT ----------
@@ -2042,7 +2082,7 @@
       requestAnimationFrame(step);
     });
   }
-  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; orderOpen = false; render(false); });
+  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; orderOpen = false; ui.conv = null; render(false); });
 
   // Pantalla encendida mientras hay un entreno en curso (no en los de días pasados).
   let wakeLock = null, wakeBusy = false;
@@ -2303,6 +2343,21 @@
       sets.push(s); save(); render(true);
     },
     'del-set': el => { const sets = S().activeWorkout.exercises[el.dataset.ei].sets; if (sets.length > 1) sets.pop(); save(); render(true); },
+    'machine-ok': el => {
+      const e = S().activeWorkout.exercises[el.dataset.ei];
+      Store.setExSettings(e.exId, { machine: Number(document.getElementById('ma-' + el.dataset.ei).value) || 0 }); render(true);
+    },
+    'machine-lado': el => {
+      const e = S().activeWorkout.exercises[el.dataset.ei];
+      Store.convertLoad(e.exId, 'lado', document.getElementById('ma-' + el.dataset.ei).value);
+      refreshSuggestions(e.exId); toast('⚖️ Ahora anotas por lado'); render(true);
+    },
+    'machine-keep': el => { Store.setExSettings(S().activeWorkout.exercises[el.dataset.ei].exId, { machine: 0 }); render(true); },
+    'conv-go': el => {
+      Store.convertLoad(el.dataset.id, ui.conv.to, document.getElementById('conv-m').value);
+      refreshSuggestions(el.dataset.id); ui.conv = null; toast('⚖️ Historial convertido'); render(true);
+    },
+    'conv-no': () => { ui.conv = null; render(true); },
     'order-open': () => { orderOpen = !orderOpen; swapOpen = null; memoOpen = null; demoOpen = null; render(true); },
     'order-mv': el => {
       const w = S().activeWorkout, blocks = workoutBlocks(w.exercises), i = Number(el.dataset.bi), j = i + Number(el.dataset.dir);
@@ -2501,7 +2556,13 @@
   document.addEventListener('input', ev => {
     const t = ev.target;
     if (t.id === 'q') { ui.q = t.value; document.getElementById('list').innerHTML = listHTML(pickerCtx ? 'pick' : 'open-ex'); }
+    else if (t.dataset.f === 'kg') setTot(t.dataset.ei, t.dataset.si, t.value);
   });
+  // Total de la serie (debajo del peso), al momento mientras escribes.
+  function setTot(ei, si, kg) {
+    const el = document.querySelector(`[data-tot="${ei}-${si}"]`), e = S().activeWorkout?.exercises[ei];
+    if (el && e) el.textContent = totTxt(e.exId, kg);
+  }
 
   document.addEventListener('change', ev => {
     const t = ev.target, d = t.dataset;
@@ -2530,6 +2591,7 @@
           s[d.f] = val;
           const inp = document.querySelector(`[data-f="${d.f}"][data-ei="${d.ei}"][data-si="${i}"]`);
           if (inp) inp.value = val;
+          if (d.f === 'kg') setTot(d.ei, i, val);
         }
       });
       save();
@@ -2549,6 +2611,8 @@
     else if (d.xf) { routineOf(t).days[d.di].exercises[d.xi][d.xf] = val; save(); }
     else if (d.df) { routineOf(t).days[d.di][d.df] = t.value; save(); }
     else if (d.rf) { routineOf(t)[d.rf] = t.value; save(); }
+    else if (d.exs === 'mode' && ['total', 'lado'].includes(t.value) && ['total', 'lado'].includes(Store.exSettings(d.id).mode)
+      && Progression.historyFor(d.id).length) { ui.conv = { id: d.id, to: t.value }; render(true); }
     else if (d.exs) { Store.setExSettings(d.id, { [d.exs]: d.exs === 'mode' ? t.value : val }); render(true); }
     else if (d.kcal) {
       const w = S().workouts.find(x => x.id === d.kcal);

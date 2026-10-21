@@ -121,6 +121,31 @@ const Store = (() => {
     get().exerciseSettings[id] = Object.assign({}, get().exerciseSettings[id], patch);
     save();
   }
+  // Peso total de una serie cuando no es lo que se anota: discos de los dos lados + la máquina sin discos,
+  // o las dos mancuernas (en búlgaras, zancadas y step-ups, por pierna). null si lo anotado ya es el total.
+  function loadTotal(id, kg) {
+    const st = exSettings(id), ex = exercise(id), n = Number(kg);
+    if (kg === '' || kg == null || isNaN(n)) return null;
+    const m = Number(st.machine) || 0;
+    if (st.mode === 'lado') return { kg: n * 2 + m, note: `total con los dos lados${m ? ` y la máquina (${String(m).replace('.', ',')} kg)` : ''}` };
+    if (st.mode === 'mancuerna' && !ex.unilateral) return { kg: n * 2, note: 'total con las dos mancuernas' };
+    if (st.mode === 'mancuerna' && ['squat', 'hinge'].includes(ex.pattern)) return { kg: n * 2, note: 'por pierna, con las dos mancuernas' };
+    return null;
+  }
+  const realKg = (id, kg) => loadTotal(id, kg)?.kg ?? (Number(kg) || 0);
+  // Pasar de anotar el total a anotar por lado (o al revés): convierte lo ya anotado para que el historial siga cuadrando.
+  function convertLoad(id, to, machine) {
+    const s = get(), m = Number(machine) || 0, r2 = x => Math.round(x * 100) / 100;
+    const f = to === 'lado' ? kg => r2(Math.max(0, (kg - m) / 2)) : kg => r2(kg * 2 + m);
+    const conv = set => { if (set.kg !== '' && set.kg != null && !isNaN(Number(set.kg))) set.kg = f(Number(set.kg)); };
+    s.workouts.concat(s.activeWorkout || []).forEach(w => w.exercises.forEach(e => {
+      if (e.exId !== id) return;
+      e.sets.forEach(conv); (e.warmup || []).forEach(conv);
+      delete e.prBest;
+    }));
+    const inc = Number(exSettings(id).increment) || 2.5;
+    setExSettings(id, { mode: to, machine: m, increment: to === 'lado' ? Math.max(1.25, inc / 2) : inc * 2 });
+  }
   function toggleExcluded(id) {
     const s = get();
     s.profile = s.profile || { goal: 'recomposicion', days: 4, level: 'intermedio', brands: ['Hammer Strength', 'Genérico'] };
@@ -195,6 +220,6 @@ const Store = (() => {
     save();
   }
 
-  return { get, save, uid, allExercises, exercise, exSettings, WARMUP_MODES, setExSettings, toggleExcluded, MODES, exportJSON, importJSON, reset,
+  return { get, save, uid, allExercises, exercise, exSettings, WARMUP_MODES, setExSettings, loadTotal, realKg, convertLoad, toggleExcluded, MODES, exportJSON, importJSON, reset,
     addPreset, updatePreset, outdatedPreset, importRoutinePack, exportRoutinePack, migrate, getUsers, currentUser, addUser, switchUser, updateUser, deleteUser };
 })();

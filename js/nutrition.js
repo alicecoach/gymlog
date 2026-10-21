@@ -3,13 +3,11 @@
 const Nutrition = (() => {
   const LEGS = ['Cuádriceps', 'Isquios', 'Glúteo', 'Gemelos', 'Aductores'];
 
-  // Peso real movido: por lado ×2, dos mancuernas ×2 (salvo unilateral).
+  // Peso real movido: los dos lados + la máquina, las dos mancuernas…
   function lifted(w) {
     return w.exercises.reduce((a, e) => {
-      const ex = Store.exercise(e.exId), st = Store.exSettings(e.exId);
-      const f = st.mode === 'lado' ? 2 : st.mode === 'mancuerna' && !ex.unilateral ? 2 : 1;
       const warm = (e.warmup || []).filter(s => s.done);
-      return a + e.sets.concat(warm).reduce((b, s) => b + (Number(s.kg) || 0) * (Number(s.reps) || 0) * f, 0);
+      return a + e.sets.concat(warm).reduce((b, s) => b + Store.realKg(e.exId, s.kg) * (Number(s.reps) || 0), 0);
     }, 0);
   }
 
