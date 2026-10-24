@@ -101,7 +101,8 @@ const Store = (() => {
     switch (ex.load) {
       case 'band': return { mode: 'goma', increment: 1 };
       case 'hold': return { mode: 'tiempo', increment: 15 };
-      case 'plates': return { mode: 'lado', increment: 2.5 };
+      // Por lado solo en las que se pueden trabajar a un lado (iso-laterales); péndulo, prensa, glute drive… en total.
+      case 'plates': return ex.unilateral ? { mode: 'lado', increment: 2.5 } : { mode: 'total', increment: 5 };
       case 'stack': return { mode: 'total', increment: 5 };
       case 'dumbbell': return { mode: 'mancuerna', increment: 2 };
       case 'bodyweight': return { mode: 'lastre', increment: 2.5 };
@@ -121,20 +122,19 @@ const Store = (() => {
     get().exerciseSettings[id] = Object.assign({}, get().exerciseSettings[id], patch);
     save();
   }
-  // Peso total de una serie cuando no es lo que se anota: discos de los dos lados + la máquina sin discos,
-  // o las dos mancuernas (en búlgaras, zancadas y step-ups, por pierna). null si lo anotado ya es el total.
+  // Total de la serie cuando se anota por lado (los dos lados juntos). null en los demás modos.
   function loadTotal(id, kg) {
-    const st = exSettings(id), ex = exercise(id), n = Number(kg);
-    if (kg === '' || kg == null || isNaN(n)) return null;
-    const m = Number(st.machine) || 0;
-    if (st.mode === 'lado') return { kg: n * 2 + m, note: `total con los dos lados${m ? ` y la máquina (${String(m).replace('.', ',')} kg)` : ''}` };
-    if (st.mode === 'mancuerna' && !ex.unilateral) return { kg: n * 2, note: 'total con las dos mancuernas' };
-    if (st.mode === 'mancuerna' && ['squat', 'hinge'].includes(ex.pattern)) return { kg: n * 2, note: 'por pierna, con las dos mancuernas' };
-    return null;
+    const n = Number(kg);
+    if (exSettings(id).mode !== 'lado' || kg === '' || kg == null || isNaN(n)) return null;
+    return { kg: n * 2 };
   }
-  const realKg = (id, kg) => loadTotal(id, kg)?.kg ?? (Number(kg) || 0);
-  // Pasar de anotar el total a anotar por lado (o al revés): convierte lo ya anotado para que el historial siga cuadrando.
-  function convertLoad(id, to, machine) {
+  // Kilos reales movidos (para los kilos levantados): por lado ×2, dos mancuernas ×2 (salvo unilateral).
+  function realKg(id, kg) {
+    const st = exSettings(id), n = Number(kg) || 0;
+    return st.mode === 'lado' || (st.mode === 'mancuerna' && !exercise(id).unilateral) ? n * 2 : n;
+  }
+  // Al pasar de total a por lado (o al revés) se convierte lo ya anotado para que el historial siga cuadrando.
+  function convertLoad(id, to, machine = 0) {
     const s = get(), m = Number(machine) || 0, r2 = x => Math.round(x * 100) / 100;
     const f = to === 'lado' ? kg => r2(Math.max(0, (kg - m) / 2)) : kg => r2(kg * 2 + m);
     const conv = set => { if (set.kg !== '' && set.kg != null && !isNaN(Number(set.kg))) set.kg = f(Number(set.kg)); };
@@ -144,7 +144,7 @@ const Store = (() => {
       delete e.prBest;
     }));
     const inc = Number(exSettings(id).increment) || 2.5;
-    setExSettings(id, { mode: to, machine: m, increment: to === 'lado' ? Math.max(1.25, inc / 2) : inc * 2 });
+    setExSettings(id, { mode: to, increment: to === 'lado' ? Math.max(1.25, inc / 2) : inc * 2 });
   }
   function toggleExcluded(id) {
     const s = get();
@@ -216,7 +216,25 @@ const Store = (() => {
   }
   // Completa datos de versiones anteriores (iconos de día).
   function migrate() {
-    get().routines.forEach(r => r.days.forEach(d => { if (!d.icon) d.icon = Icons.dayIconFor(d.name); }));
+    const s = get();
+    s.routines.forEach(r => r.days.forEach(d => { if (!d.icon) d.icon = Icons.dayIconFor(d.name); }));
+    // Una vez: las máquinas de discos bilaterales pasan de «por lado» a total (lo anotado se convierte,
+    // con el peso de la máquina si se había puesto) y se olvida el peso de la máquina.
+    if (!s.settings.loadV2) {
+      const ws = s.workouts.concat(s.activeWorkout || []);
+      const ids = new Set([...Object.keys(s.exerciseSettings), ...ws.flatMap(w => w.exercises.map(e => e.exId))]);
+      ids.forEach(id => {
+        const ex = exercise(id), st = s.exerciseSettings[id] || {};
+        if (ex.load === 'plates' && !ex.unilateral && (st.mode || 'lado') === 'lado') {
+          if (ws.some(w => w.exercises.some(e => e.exId === id))) {
+            s.exerciseSettings[id] = Object.assign({}, st, { mode: 'lado', increment: st.increment ?? 2.5 });
+            convertLoad(id, 'total', st.machine);
+          } else { delete st.mode; delete st.increment; }
+        }
+        if (s.exerciseSettings[id]) delete s.exerciseSettings[id].machine;
+      });
+      s.settings.loadV2 = 1;
+    }
     save();
   }
 

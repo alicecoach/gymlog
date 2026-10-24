@@ -230,15 +230,6 @@ legend { color: var(--muted); font-size: .85rem; padding: 0 6px; }
 .check { width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--muted); font-size: 1.2rem; font-weight: 800; cursor: pointer; transition: background .2s, transform .15s; }
 tr.done .check { background: var(--ok); border-color: var(--ok); color: #05261a; }
 .sets .tot { display: block; font-size: .72rem; color: var(--accent); font-weight: 700; margin-top: 2px; min-height: .9em; }
-.tot-note { font-size: .74rem; color: var(--muted); margin: 0 0 6px; }
-.machine-ask { margin: 4px 0 8px; padding: 10px; border-radius: 14px; background: rgba(198, 244, 50, .06); border: 1px dashed rgba(198, 244, 50, .35); animation: rise .3s var(--ease); }
-.machine-ask p { margin: 0 0 8px; }
-.machine-ask small { display: block; margin-top: 6px; }
-.machine-ask > .btn { margin-top: 6px; }
-.ma-row { display: flex; align-items: center; gap: 8px; }
-.ma-row input { width: 90px; margin: 0; text-align: center; font-weight: 700; }
-.conv-card { margin: 10px 0; padding: 10px; border-radius: 14px; background: rgba(198, 244, 50, .06); border: 1px dashed rgba(198, 244, 50, .35); }
-.conv-card p { margin: 6px 0; }
 .finish-btn { margin-top: 14px; min-height: 52px; font-size: 1.02rem; }
 tr.just .check { animation: checkpop .45s var(--ease); }
 tr.just input { animation: flash .6s ease-out; }

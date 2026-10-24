@@ -29,9 +29,11 @@
   ];
   // Novedades: al publicar una mejora, añade una entrada arriba con un número mayor. Se enseña una vez por perfil.
   const NEWS = [
+    { v: 18, date: '2026-10-24', items: [
+      '⚖️ <b>Peso más sencillo</b>: «kg/lado» solo en las máquinas que puedes trabajar a un lado (iso-laterales), con el total de los dos lados debajo de cada serie. Ya no se pregunta el peso de la máquina.',
+      '🏋️ En péndulo, prensa, Glute Drive y demás máquinas donde empujas con todo a la vez anotas el <b>total</b>. Lo que tenías anotado por lado se ha convertido solo.',
+    ] },
     { v: 17, date: '2026-10-21', items: [
-      '⚖️ <b>Peso total debajo de cada serie</b>: anota los discos de cada lado (o el peso de una mancuerna) y la app te enseña el total, con el peso de la máquina incluido. En búlgaras, zancadas y step-ups, el peso por pierna.',
-      '🏋️ La primera vez en cada máquina de discos te pregunta cuánto pesa sin discos (si lo dejas vacío, cuenta 0). Si en una anotabas el total, puedes pasarla a «por lado» y la app convierte lo que ya tenías anotado.',
       '🏁 <b>«Terminar» ahora está abajo del todo</b>, al acabar el último ejercicio, y «Descartar» arriba.',
     ] },
     { v: 16, date: '2026-10-18', items: [
@@ -131,7 +133,7 @@
     ['⇅', 'Otro orden hoy', 'Toca ⇅ arriba del entreno, junto a «Descartar», para subir o bajar ejercicios del entreno. Solo para hoy: la rutina no cambia.'],
     ['✨', 'Generar una rutina', 'En Rutinas → «Generar rutina», según tu objetivo, días y máquinas. Puedes generar otra cuando quieras.'],
     ['📝', 'Molestias y notas', 'Toca 📝 en el ejercicio para marcar una molestia o apuntar un ajuste. Te lo recuerda la próxima vez.'],
-    ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, el peso de la máquina sin discos y la subida mínima. Debajo de cada serie ves el peso total.'],
+    ['⚖️', 'Cómo anotas el peso', 'En la ficha de cada ejercicio: por lado, total o por mancuerna, y la subida mínima. Si anotas por lado, debajo de cada serie ves el total.'],
     ['📖', 'Cómo se hace', 'Toca «📖 Cómo se hace» en el entreno o abre la ficha del ejercicio: los pasos de la técnica y, en muchos, una ilustración animada.'],
     ['🏃', 'Fuera del gym', 'Correr, pádel, bici, yoga…: regístralo desde Inicio → «Fuera del gym». Sale en tu historial y en el resumen del mes, pero no cuenta para la racha de entrenos.'],
     ['📷', 'Foto de tu máquina', 'Desde su ficha: la reconoces de un vistazo durante el entreno.'],
@@ -561,8 +563,8 @@
   const since = (exId, t) => Progression.historyFor(exId).filter(h => h.date >= t);
   const bestSecs = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.secs) || 0)));
   const bestReps = (exId, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.map(s => Number(s.reps) || 0)));
-  // Kilos reales: en las máquinas de discos se anota por lado (se suman los dos lados y la máquina).
-  const realKg = (exId, kg) => Store.exSettings(exId).mode === 'lado' ? Store.realKg(exId, kg) : Number(kg) || 0;
+  // Kilos reales: si se anota por lado, los dos lados juntos.
+  const realKg = (exId, kg) => Store.loadTotal(exId, kg)?.kg ?? (Number(kg) || 0);
   const bestKg = (exId, reps, t = 0) => Math.max(0, ...since(exId, t).flatMap(h => h.sets.filter(s => Number(s.reps) >= reps).map(s => realKg(exId, s.kg))));
   const HIP_THRUSTS = ['g-hip-thrust', 'hs-glute-drive', 'g-hip-thrust-machine', 'mm-hip-thrust', 'g-db-hip-thrust'];
   const firstOk = ids => ids.find(id => !excluded().includes(id)) || ids[0];
@@ -1309,9 +1311,7 @@
       <div class="card"><h3>Carga</h3><div class="rx-fields two">
         <label>Cómo anoto el peso<select data-exs="mode" data-id="${id}">${Object.entries(Store.MODES).map(([k, v]) => `<option value="${k}" ${st.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         ${st.mode === 'goma' || st.mode === 'tiempo' ? '' : `<label>Subida mínima (${st.label})<input type="number" step="0.25" inputmode="decimal" data-exs="increment" data-id="${id}" value="${st.increment}"></label>`}
-        ${st.mode === 'lado' ? `<label>Máquina sin discos (kg)<input type="number" step="any" inputmode="decimal" data-exs="machine" data-id="${id}" value="${esc(st.machine ?? '')}" placeholder="0"></label>` : ''}</div>
-        ${ui.conv?.id === id ? convCard(id, st, hist.length) : ''}
-        <p class="muted small">${st.mode === 'lado' ? 'Anotas los discos de un lado; debajo de cada serie ves el total con los dos lados y la máquina. ' : ''}${st.mode === 'goma' ? `Anotas el color de la goma. Orden de suave a dura: ${Object.values(BANDS).map(b => b.dot + ' ' + b.label.toLowerCase()).join(' → ')} (puede variar según la marca).`
+        <p class="muted small">${st.mode === 'lado' ? 'Anotas los discos de un lado; debajo de cada serie ves el total de los dos lados. ' : ''}${st.mode === 'goma' ? `Anotas el color de la goma. Orden de suave a dura: ${Object.values(BANDS).map(b => b.dot + ' ' + b.label.toLowerCase()).join(' → ')} (puede variar según la marca).`
           : st.mode === 'tiempo' ? 'Eliges los segundos de cada serie y la app hace la cuenta atrás.'
           : 'Ajusta la subida al salto real de la máquina (p. ej. 1,25 si tienes discos pequeños, o el salto entre placas).'}</p>
         ${Store.WARMUP_MODES.includes(st.mode) ? `<label class="check-row"><input type="checkbox" data-exs-wu data-id="${id}" ${st.warmup ? 'checked' : ''}> 🔥 Series de aproximación (50 % × 8 y 75 % × 4)</label>` : ''}</div>
@@ -1476,29 +1476,6 @@
       <button class="btn primary block" data-act="order-open">Listo</button></div>`;
   }
 
-  // Al cambiar entre «total» y «por lado» con historial: se convierte lo anotado para que el progreso siga cuadrando.
-  function convCard(id, st, n) {
-    const to = ui.conv.to, toLado = to === 'lado';
-    return `<div class="conv-card"><b>Convertir lo que ya has anotado</b>
-      <p class="small">Tienes ${n} ${n === 1 ? 'sesión anotada' : 'sesiones anotadas'} en ${st.label}. La app ${n === 1 ? 'la pasa' : 'las pasa'} a ${Store.MODES[to]} para que tu progreso siga cuadrando.</p>
-      <label>Máquina sin discos (kg)<input id="conv-m" type="number" step="any" inputmode="decimal" value="${esc(st.machine ?? '')}" placeholder="0"></label>
-      <p class="muted small">${toLado ? 'Ejemplo: 100 kg en total con una máquina de 20 kg → 40 kg/lado.' : 'Ejemplo: 40 kg/lado con una máquina de 20 kg → 100 kg en total.'} Si no lo sabes, déjalo vacío.</p>
-      <div class="row gap"><button class="btn small primary" data-act="conv-go" data-id="${id}">Cambiar y convertir</button>
-        <button class="btn small ghost" data-act="conv-no">Cancelar</button></div></div>`;
-  }
-
-  // Primera vez en una máquina de discos: cuánto pesa sin discos (vacío = 0) o, si anotabas el total, pasar a «por lado».
-  function machineAsk(e, ei, st) {
-    const inp = `<input id="ma-${ei}" type="number" step="any" inputmode="decimal" placeholder="0"><span>kg</span>`;
-    if (st.mode === 'lado') return `<div class="machine-ask"><p class="small">¿Cuánto pesa la máquina sin discos?</p>
-      <div class="ma-row">${inp}<button class="btn small" data-act="machine-ok" data-ei="${ei}">OK</button></div>
-      <small class="muted">Se suma al total de cada serie. Si no lo sabes, déjalo vacío: cuenta 0 y no vuelve a preguntar.</small></div>`;
-    return `<div class="machine-ask"><p class="small">Aquí anotas el total. ¿Prefieres anotar los discos de cada lado y que la app sume? Dime cuánto pesa la máquina sin discos:</p>
-      <div class="ma-row">${inp}<button class="btn small primary" data-act="machine-lado" data-ei="${ei}">Pasar a por lado</button></div>
-      <button class="btn small ghost" data-act="machine-keep" data-ei="${ei}">Seguir con el total</button>
-      <small class="muted">Lo que ya tienes anotado se convierte (p. ej. 100 kg con una máquina de 20 kg → 40 kg/lado).</small></div>`;
-  }
-  const askMachine = (e, st) => !S().activeWorkout?.past && Store.exercise(e.exId).load === 'plates' && st.machine === undefined && ['lado', 'total'].includes(st.mode);
   const totTxt = (exId, kg) => { const t = Store.loadTotal(exId, kg); return t ? `= ${fmtNum(t.kg)} kg` : ''; };
   // Tras cambiar el modo de anotar: la sugerencia del entreno en curso se recalcula con lo convertido.
   function refreshSuggestions(id) {
@@ -1563,9 +1540,7 @@
         : `<button class="demo-btn" data-act="demo-open" data-ei="${ei}">📖 Cómo se hace</button>`}
       <div class="sug ${sg.type}">${sugIcon(sg.type)} ${esc(sg.msg)}</div>
       <div class="prev">Anterior: ${esc(prevTxt)}</div>${warm}
-      ${askMachine(e, st) ? machineAsk(e, ei, st) : ''}
       <table class="sets ${st.mode === 'tiempo' ? 'hold' : st.mode === 'goma' ? 'band' : ''}">${setRows(e, ei, st.mode)}</table>
-      ${Store.loadTotal(e.exId, 0) ? `<p class="tot-note">= ${esc(Store.loadTotal(e.exId, 0).note)}</p>` : ''}
       <div class="row gap"><button class="btn small ghost" data-act="add-set" data-ei="${ei}">+ Serie</button>
       <button class="btn small ghost" data-act="del-set" data-ei="${ei}">− Serie</button></div></section>`;
   }
@@ -2082,7 +2057,7 @@
       requestAnimationFrame(step);
     });
   }
-  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; orderOpen = false; ui.conv = null; render(false); });
+  window.addEventListener('hashchange', () => { swapOpen = null; memoOpen = null; demoOpen = null; orderOpen = false; render(false); });
 
   // Pantalla encendida mientras hay un entreno en curso (no en los de días pasados).
   let wakeLock = null, wakeBusy = false;
@@ -2343,21 +2318,6 @@
       sets.push(s); save(); render(true);
     },
     'del-set': el => { const sets = S().activeWorkout.exercises[el.dataset.ei].sets; if (sets.length > 1) sets.pop(); save(); render(true); },
-    'machine-ok': el => {
-      const e = S().activeWorkout.exercises[el.dataset.ei];
-      Store.setExSettings(e.exId, { machine: Number(document.getElementById('ma-' + el.dataset.ei).value) || 0 }); render(true);
-    },
-    'machine-lado': el => {
-      const e = S().activeWorkout.exercises[el.dataset.ei];
-      Store.convertLoad(e.exId, 'lado', document.getElementById('ma-' + el.dataset.ei).value);
-      refreshSuggestions(e.exId); toast('⚖️ Ahora anotas por lado'); render(true);
-    },
-    'machine-keep': el => { Store.setExSettings(S().activeWorkout.exercises[el.dataset.ei].exId, { machine: 0 }); render(true); },
-    'conv-go': el => {
-      Store.convertLoad(el.dataset.id, ui.conv.to, document.getElementById('conv-m').value);
-      refreshSuggestions(el.dataset.id); ui.conv = null; toast('⚖️ Historial convertido'); render(true);
-    },
-    'conv-no': () => { ui.conv = null; render(true); },
     'order-open': () => { orderOpen = !orderOpen; swapOpen = null; memoOpen = null; demoOpen = null; render(true); },
     'order-mv': el => {
       const w = S().activeWorkout, blocks = workoutBlocks(w.exercises), i = Number(el.dataset.bi), j = i + Number(el.dataset.dir);
@@ -2612,7 +2572,7 @@
     else if (d.df) { routineOf(t).days[d.di][d.df] = t.value; save(); }
     else if (d.rf) { routineOf(t)[d.rf] = t.value; save(); }
     else if (d.exs === 'mode' && ['total', 'lado'].includes(t.value) && ['total', 'lado'].includes(Store.exSettings(d.id).mode)
-      && Progression.historyFor(d.id).length) { ui.conv = { id: d.id, to: t.value }; render(true); }
+      && Progression.historyFor(d.id).length) { Store.convertLoad(d.id, t.value); refreshSuggestions(d.id); toast('⚖️ Lo ya anotado se ha convertido'); render(true); }
     else if (d.exs) { Store.setExSettings(d.id, { [d.exs]: d.exs === 'mode' ? t.value : val }); render(true); }
     else if (d.kcal) {
       const w = S().workouts.find(x => x.id === d.kcal);
